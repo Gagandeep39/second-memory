@@ -253,7 +253,7 @@ class GoogleDriveMirrorClient(
 
     private companion object {
         const val APP_NAME = "SecondMemory"
-        const val ROOT_FOLDER_NAME = "SecondMemory"
+        const val ROOT_FOLDER_NAME = "com.secondmemory"
         const val DATA_FOLDER_NAME = "data"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
         const val TIME_SKEW_MILLIS = 2_000L
