@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
+import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,7 @@ fun RecordThoughtScreen(
     var draftText by remember { mutableStateOf("") }
     var isListening by remember { mutableStateOf(false) }
     var hasSpeechInput by remember { mutableStateOf(false) }
+    var rmsLevel by remember { mutableStateOf(0f) }
     var speechStatus by remember { mutableStateOf("Tap Start Listening to dictate your thought.") }
 
     val speechRecognizer = remember(context) {
@@ -97,17 +99,21 @@ fun RecordThoughtScreen(
                     speechStatus = "Capturing speech..."
                 }
 
-                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onRmsChanged(rmsdB: Float) {
+                    rmsLevel = normalizeRmsLevel(rmsdB)
+                }
 
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
                 override fun onEndOfSpeech() {
                     isListening = false
+                    rmsLevel = 0f
                     speechStatus = "Processing transcription..."
                 }
 
                 override fun onError(error: Int) {
                     isListening = false
+                    rmsLevel = 0f
                     speechStatus = "Speech capture failed (code $error). Try again."
                 }
 
@@ -123,6 +129,7 @@ fun RecordThoughtScreen(
                         speechStatus = "No speech detected."
                     }
                     isListening = false
+                    rmsLevel = 0f
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -158,11 +165,17 @@ fun RecordThoughtScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
 
+        AudioLevelVisualizer(
+            normalizedLevel = rmsLevel,
+            isListening = isListening,
+        )
+
         Button(
             onClick = {
                 if (isListening) {
                     speechRecognizer?.stopListening()
                     isListening = false
+                    rmsLevel = 0f
                     speechStatus = "Stopped listening."
                 } else {
                     val isGranted = ContextCompat.checkSelfPermission(
@@ -214,4 +227,11 @@ fun RecordThoughtScreen(
             Text("Back")
         }
     }
+}
+
+/**
+ * Maps platform RMS dB values to a stable 0..1 range for UI animation.
+ */
+private fun normalizeRmsLevel(rmsdB: Float): Float {
+    return ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
 }
