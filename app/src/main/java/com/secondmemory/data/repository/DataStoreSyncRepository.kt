@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.secondmemory.data.drive.GoogleDriveMirrorClient
 import com.secondmemory.domain.model.SyncMetadata
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SyncRepository
@@ -29,7 +30,10 @@ private val Context.syncStore: DataStore<Preferences> by preferencesDataStore(na
  * The actual remote Drive upload/download implementation can be swapped in later without
  * changing the UI or sync state contract.
  */
-class DataStoreSyncRepository(private val context: Context) : SyncRepository {
+class DataStoreSyncRepository(
+    private val context: Context,
+    private val driveMirrorClient: GoogleDriveMirrorClient,
+) : SyncRepository {
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return context.syncStore.data.map { preferences ->
             preferences.toMetadata()
@@ -41,37 +45,58 @@ class DataStoreSyncRepository(private val context: Context) : SyncRepository {
         return preferences.toMetadata()
     }
 
-    override suspend fun syncNow() {
+    override suspend fun syncNow(driveSyncEnabled: Boolean, accountEmail: String?) {
         withContext(Dispatchers.IO) {
-        context.syncStore.edit { prefs ->
-            prefs[Keys.STATE] = SyncState.SYNCING.name
-            prefs[Keys.LAST_MESSAGE] = "Preparing local sync plan"
-        }
+            context.syncStore.edit { prefs ->
+                prefs[Keys.STATE] = SyncState.SYNCING.name
+                prefs[Keys.LAST_MESSAGE] = if (driveSyncEnabled) {
+                    "Syncing local data tree to Google Drive"
+                } else {
+                    "Preparing local sync plan"
+                }
+            }
 
-        runCatching {
-            val stats = scanLocalTree()
-            val message = buildString {
-                append("Local sync scan complete: ")
-                append(stats.rawCount)
-                append(" raw, ")
-                append(stats.dailyCount)
-                append(" daily, ")
-                append(stats.weeklyCount)
-                append(" weekly, ")
-                append(stats.monthlyCount)
-                append(" monthly file(s)")
+            runCatching {
+                val message = if (driveSyncEnabled) {
+                    val report = driveMirrorClient.syncLocalDataTree(accountEmail)
+                    buildString {
+                        append("Google Drive sync complete: ")
+                        append(report.uploadedCount)
+                        append(" uploaded, ")
+                        append(report.downloadedCount)
+                        append(" downloaded, ")
+                        append(report.deletedCount)
+                        append(" deleted, ")
+                        append(report.conflictedCount)
+                        append(" conflicted")
+                    }
+                } else {
+                    val stats = scanLocalTree()
+                    buildString {
+                        append("Local sync scan complete: ")
+                        append(stats.rawCount)
+                        append(" raw, ")
+                        append(stats.dailyCount)
+                        append(" daily, ")
+                        append(stats.weeklyCount)
+                        append(" weekly, ")
+                        append(stats.monthlyCount)
+                        append(" monthly file(s)")
+                    }
+                }
+
+                context.syncStore.edit { prefs ->
+                    prefs[Keys.STATE] = SyncState.SUCCESS.name
+                    prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
+                    prefs[Keys.LAST_MESSAGE] = message
+                }
+            }.onFailure { error ->
+                context.syncStore.edit { prefs ->
+                    prefs[Keys.STATE] = SyncState.ERROR.name
+                    prefs[Keys.LAST_MESSAGE] = error.message ?: "Sync failed"
+                }
+                throw error
             }
-            context.syncStore.edit { prefs ->
-                prefs[Keys.STATE] = SyncState.SUCCESS.name
-                prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
-                prefs[Keys.LAST_MESSAGE] = message
-            }
-        }.onFailure { error ->
-            context.syncStore.edit { prefs ->
-                prefs[Keys.STATE] = SyncState.ERROR.name
-                prefs[Keys.LAST_MESSAGE] = error.message ?: "Sync failed"
-            }
-        }
         }
     }
 

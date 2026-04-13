@@ -40,7 +40,18 @@ class DataStoreSettingsRepository(
 
     override suspend fun setDriveSyncEnabled(enabled: Boolean) {
         context.appSettingsStore.edit { prefs ->
-            prefs[Keys.DRIVE_SYNC_ENABLED] = enabled
+            val hasConnectedAccount = !(prefs[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL] ?: "").isBlank()
+            prefs[Keys.DRIVE_SYNC_ENABLED] = enabled && hasConnectedAccount
+        }
+    }
+
+    override suspend fun setConnectedGoogleAccountEmail(email: String?) {
+        context.appSettingsStore.edit { prefs ->
+            val trimmed = email?.trim().orEmpty()
+            prefs[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL] = trimmed
+            if (trimmed.isBlank()) {
+                prefs[Keys.DRIVE_SYNC_ENABLED] = false
+            }
         }
     }
 
@@ -70,17 +81,24 @@ class DataStoreSettingsRepository(
     }
 
     override suspend fun syncNow() {
-        syncRepository.syncNow()
+        val settings = currentSettings()
+        syncRepository.syncNow(
+            driveSyncEnabled = settings.driveSyncEnabled,
+            accountEmail = settings.connectedGoogleAccountEmail,
+        )
     }
 
     /**
      * Maps datastore preferences to strongly typed app settings.
      */
     private fun Preferences.toAppSettings(syncMetadata: SyncMetadata): AppSettings {
+        val connectedAccount = this[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL]
         val geminiKey = this[Keys.GEMINI_API_KEY] ?: ""
         val cloudEnabled = (this[Keys.CLOUD_SUMMARY_ENABLED] ?: true) && geminiKey.isNotBlank()
+        val driveEnabled = (this[Keys.DRIVE_SYNC_ENABLED] ?: false) && !connectedAccount.isNullOrBlank()
         return AppSettings(
-            driveSyncEnabled = this[Keys.DRIVE_SYNC_ENABLED] ?: false,
+            driveSyncEnabled = driveEnabled,
+            connectedGoogleAccountEmail = connectedAccount,
             cloudSummaryEnabled = cloudEnabled,
             geminiApiKey = geminiKey,
             syncState = syncMetadata.state,
@@ -94,6 +112,7 @@ class DataStoreSettingsRepository(
      */
     private object Keys {
         val DRIVE_SYNC_ENABLED = booleanPreferencesKey("drive_sync_enabled")
+        val CONNECTED_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("connected_google_account_email")
         val CLOUD_SUMMARY_ENABLED = booleanPreferencesKey("cloud_summary_enabled")
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
     }

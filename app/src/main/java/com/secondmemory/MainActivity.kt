@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.secondmemory.data.drive.GoogleDriveMirrorClient
 import com.secondmemory.data.llm.GeminiLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
@@ -55,7 +56,13 @@ fun SecondMemoryApp() {
         JsonThoughtRepository(context)
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
-    val syncRepository = remember(context) { DataStoreSyncRepository(context) }
+    val driveMirrorClient = remember(context) { GoogleDriveMirrorClient(context) }
+    val syncRepository = remember(context) {
+        DataStoreSyncRepository(
+            context = context,
+            driveMirrorClient = driveMirrorClient,
+        )
+    }
     val settingsRepository = remember(context) {
         DataStoreSettingsRepository(
             context = context,

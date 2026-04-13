@@ -4,20 +4,21 @@ This file now tracks only remaining work. Completed phases (foundation, file sto
 
 ## Phase 4: Sync and Background
 
-1. Implement Google Drive directory mirror for local `data/`. It must be present inside com.secondmemory app-specific storage to avoid permission issues.
-2. Sync scope must include:
+1. Harden the Google Drive directory mirror for local `data/`.
+2. Sync scope must continue to include:
    1. `data/raw`
    2. `data/daily`
    3. `data/weekly`
    4. `data/monthly`
-3. Add a deterministic sync strategy:
+3. Harden the deterministic sync strategy:
    1. Compare by relative path + modified time + size/hash.
    2. Use last-write-wins for v1.
-4.  Add manual sync action and sync diagnostics in Settings:
-    1.  Last sync time.
-    2.  Last sync status/error.
-    3.  File counts uploaded/downloaded.
-5.  Add WorkManager jobs:
+4. Finish sync diagnostics and recovery UX in Settings:
+    1. Last sync time.
+    2. Last sync status/error.
+    3. File counts uploaded/downloaded.
+    4. Consent and re-auth recovery for Google Drive access.
+5. Add WorkManager jobs:
     1.  Periodic background sync.
     2.  Nightly daily-summary generation trigger.
     3.  Add retry/backoff and network constraints for background jobs.
@@ -43,10 +44,9 @@ This file now tracks only remaining work. Completed phases (foundation, file sto
 
 ## Immediate Sprint (Recommended)
 
-1. Add sync status model and DataStore fields for last sync metadata.
-2. Build Drive API integration for upload/download of `data/` files.
-3. Implement one-shot manual sync button in Settings.
-4. Add background periodic sync worker and verify with emulator tests.
+1. Add background periodic sync worker and verify with emulator tests.
+2. Add retry/backoff and network constraints to sync and summary jobs.
+3. Tighten sync conflict handling and diagnostics after real-world testing.
 
 ## Current Non-Goals
 

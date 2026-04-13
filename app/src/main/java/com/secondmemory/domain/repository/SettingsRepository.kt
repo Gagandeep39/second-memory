@@ -24,6 +24,11 @@ interface SettingsRepository {
     suspend fun setDriveSyncEnabled(enabled: Boolean)
 
     /**
+     * Stores the email of the Google account connected for Drive sync.
+     */
+    suspend fun setConnectedGoogleAccountEmail(email: String?)
+
+    /**
      * Enables or disables cloud summary generation.
      */
     suspend fun setCloudSummaryEnabled(enabled: Boolean)

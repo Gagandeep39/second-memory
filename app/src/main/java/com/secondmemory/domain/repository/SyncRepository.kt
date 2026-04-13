@@ -20,5 +20,5 @@ interface SyncRepository {
     /**
      * Starts a manual sync operation.
      */
-    suspend fun syncNow()
+    suspend fun syncNow(driveSyncEnabled: Boolean, accountEmail: String?)
 }
