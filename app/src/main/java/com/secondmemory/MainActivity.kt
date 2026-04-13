@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.secondmemory.data.repository.DataStoreSettingsRepository
+import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
@@ -51,6 +52,7 @@ fun SecondMemoryApp() {
     val thoughtRepository = remember(context) {
         JsonThoughtRepository(context)
     }
+    val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
     val settingsRepository = remember(context) { DataStoreSettingsRepository(context) }
     val navController = rememberNavController()
     val backStackEntry = navController.currentBackStackEntryAsState().value
@@ -88,6 +90,7 @@ fun SecondMemoryApp() {
         AppNavHost(
             navController = navController,
             thoughtRepository = thoughtRepository,
+            dailySummaryRepository = dailySummaryRepository,
             settingsRepository = settingsRepository,
         )
     }
