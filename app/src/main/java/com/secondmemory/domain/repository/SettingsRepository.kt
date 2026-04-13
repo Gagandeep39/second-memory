@@ -13,6 +13,11 @@ interface SettingsRepository {
     fun observeSettings(): Flow<AppSettings>
 
     /**
+     * Returns the current settings snapshot.
+     */
+    suspend fun currentSettings(): AppSettings
+
+    /**
      * Enables or disables Google Drive sync integration.
      */
     suspend fun setDriveSyncEnabled(enabled: Boolean)
@@ -21,4 +26,9 @@ interface SettingsRepository {
      * Enables or disables cloud summary generation.
      */
     suspend fun setCloudSummaryEnabled(enabled: Boolean)
+
+    /**
+     * Stores a Gemini API key used for cloud summary generation.
+     */
+    suspend fun setGeminiApiKey(apiKey: String)
 }

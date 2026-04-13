@@ -6,4 +6,5 @@ package com.secondmemory.domain.model
 data class AppSettings(
     val driveSyncEnabled: Boolean,
     val cloudSummaryEnabled: Boolean,
+    val geminiApiKey: String,
 )

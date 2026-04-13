@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.secondmemory.data.llm.GeminiLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
@@ -54,6 +55,7 @@ fun SecondMemoryApp() {
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
     val settingsRepository = remember(context) { DataStoreSettingsRepository(context) }
+    val llmSummaryClient = remember { GeminiLlmSummaryClient() }
     val navController = rememberNavController()
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route
@@ -92,6 +94,7 @@ fun SecondMemoryApp() {
             thoughtRepository = thoughtRepository,
             dailySummaryRepository = dailySummaryRepository,
             settingsRepository = settingsRepository,
+            llmSummaryClient = llmSummaryClient,
         )
     }
 }

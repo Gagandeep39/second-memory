@@ -19,9 +19,27 @@ import java.io.File
 class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
     private val mutex = Mutex()
 
+    override suspend fun listAvailableDayKeys(): List<String> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            rawDirectory(context)
+                .listFiles { file -> file.isFile && file.extension.equals("json", ignoreCase = true) }
+                .orEmpty()
+                .map { file -> file.nameWithoutExtension }
+                .sortedDescending()
+        }
+    }
+
     override suspend fun listForDay(dayKey: String): List<Thought> = withContext(Dispatchers.IO) {
         mutex.withLock {
             readDayThoughts(dayKey)
+        }
+    }
+
+    override suspend fun readRawJson(dayKey: String): String = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val file = dayFile(dayKey)
+            if (!file.exists() || !file.isFile) return@withLock ""
+            file.readText()
         }
     }
 

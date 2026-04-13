@@ -7,9 +7,19 @@ import com.secondmemory.domain.model.Thought
  */
 interface ThoughtRepository {
     /**
+     * Returns day keys for all available raw thought files sorted newest first.
+     */
+    suspend fun listAvailableDayKeys(): List<String>
+
+    /**
      * Returns all thoughts stored for the provided ISO day key (yyyy-MM-dd).
      */
     suspend fun listForDay(dayKey: String): List<Thought>
+
+    /**
+     * Loads the raw JSON file content for a day key.
+     */
+    suspend fun readRawJson(dayKey: String): String
 
     /**
      * Creates or updates a thought in the provided day collection.

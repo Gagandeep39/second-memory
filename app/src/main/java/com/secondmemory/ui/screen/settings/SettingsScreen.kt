@@ -8,15 +8,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.repository.SettingsRepository
 import kotlinx.coroutines.launch
@@ -26,14 +33,22 @@ import androidx.compose.ui.unit.dp
  * Screen that exposes persisted app-level feature toggles.
  */
 @Composable
-fun SettingsScreen(settingsRepository: SettingsRepository) {
+fun SettingsScreen(
+    settingsRepository: SettingsRepository,
+    llmSummaryClient: LlmSummaryClient,
+) {
     val scope = rememberCoroutineScope()
     val settings by settingsRepository.observeSettings().collectAsState(
         initial = AppSettings(
             driveSyncEnabled = false,
-            cloudSummaryEnabled = true,
+            cloudSummaryEnabled = false,
+            geminiApiKey = "",
         )
     )
+    var geminiApiKeyDraft by remember(settings.geminiApiKey) {
+        mutableStateOf(settings.geminiApiKey)
+    }
+    var geminiStatusMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -55,16 +70,68 @@ fun SettingsScreen(settingsRepository: SettingsRepository) {
                 }
             },
         )
-        SettingToggleRow(
-            title = "Cloud Summaries",
-            description = "Allow daily summary generation using a cloud model.",
-            checked = settings.cloudSummaryEnabled,
-            onCheckedChange = { enabled ->
+
+        OutlinedTextField(
+            value = geminiApiKeyDraft,
+            onValueChange = { geminiApiKeyDraft = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Gemini API Key") },
+            visualTransformation = PasswordVisualTransformation(),
+        )
+
+        Button(
+            onClick = {
                 scope.launch {
-                    settingsRepository.setCloudSummaryEnabled(enabled)
+                    settingsRepository.setGeminiApiKey(geminiApiKeyDraft)
+                    geminiStatusMessage = "Gemini key saved."
                 }
             },
-        )
+        ) {
+            Text("Save Gemini Key")
+        }
+
+        Button(
+            enabled = geminiApiKeyDraft.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    geminiStatusMessage = "Testing Gemini key..."
+                    runCatching {
+                        llmSummaryClient.testConnection(geminiApiKeyDraft)
+                    }.onSuccess {
+                        geminiStatusMessage = "Gemini key is valid."
+                    }.onFailure { error ->
+                        geminiStatusMessage = "Gemini key test failed: ${error.message}"
+                    }
+                }
+            },
+        ) {
+            Text("Test Gemini Key")
+        }
+
+        geminiStatusMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+
+        if (settings.geminiApiKey.isBlank()) {
+            Text(
+                text = "Add Gemini API key to enable cloud summaries.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            SettingToggleRow(
+                title = "Cloud Summaries",
+                description = "Allow daily summary generation using Gemini cloud model.",
+                checked = settings.cloudSummaryEnabled,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        settingsRepository.setCloudSummaryEnabled(enabled)
+                    }
+                },
+            )
+        }
     }
 }
 

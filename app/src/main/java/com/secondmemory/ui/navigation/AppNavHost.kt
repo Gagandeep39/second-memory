@@ -6,6 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
@@ -26,6 +27,7 @@ fun AppNavHost(
     thoughtRepository: ThoughtRepository,
     dailySummaryRepository: DailySummaryRepository,
     settingsRepository: SettingsRepository,
+    llmSummaryClient: LlmSummaryClient,
 ) {
     NavHost(
         navController = navController,
@@ -41,7 +43,10 @@ fun AppNavHost(
         }
         composable(AppDestination.DailyView.route) {
             DailyViewScreen(
+                thoughtRepository = thoughtRepository,
                 dailySummaryRepository = dailySummaryRepository,
+                settingsRepository = settingsRepository,
+                llmSummaryClient = llmSummaryClient,
                 onOpenSummary = { fileName ->
                     navController.navigate(AppDestination.DailySummaryDetail.routeForFile(fileName))
                 },
@@ -61,7 +66,10 @@ fun AppNavHost(
             )
         }
         composable(AppDestination.Settings.route) {
-            SettingsScreen(settingsRepository = settingsRepository)
+            SettingsScreen(
+                settingsRepository = settingsRepository,
+                llmSummaryClient = llmSummaryClient,
+            )
         }
         composable(AppDestination.RecordThought.route) {
             RecordThoughtScreen(

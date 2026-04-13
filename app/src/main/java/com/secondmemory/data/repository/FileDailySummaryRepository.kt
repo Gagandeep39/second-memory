@@ -34,6 +34,21 @@ class FileDailySummaryRepository(private val context: Context) : DailySummaryRep
         summaryFile.readText()
     }
 
+    override suspend fun readSummaryForDay(dayKey: String): String = withContext(Dispatchers.IO) {
+        val summaryFile = File(dailyDirectory(context), summaryFileName(dayKey))
+        if (!summaryFile.exists() || !summaryFile.isFile) return@withContext ""
+        summaryFile.readText()
+    }
+
+    override suspend fun saveSummaryForDay(dayKey: String, markdown: String) = withContext(Dispatchers.IO) {
+        val summaryFile = File(dailyDirectory(context), summaryFileName(dayKey))
+        summaryFile.writeText(markdown)
+    }
+
+    override fun summaryFileName(dayKey: String): String {
+        return "$dayKey.md"
+    }
+
     /**
      * Returns the first non-empty line as a preview snippet.
      */
