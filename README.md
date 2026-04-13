@@ -12,31 +12,33 @@ The current implementation emphasizes:
 
 Implemented:
 1. Adaptive top-level navigation with routes for Raw Thoughts, Daily View, Settings, and Record Thought.
-2. Record Thought screen with speech-to-text, auto-start listening, visualizer, manual editing, and save.
-3. Cursor-aware speech insertion (transcript inserts at current cursor/selection).
-4. Raw Thoughts date browsing with edit/delete over daily raw JSON files.
-5. Daily View summary cards (one per `data/daily/*.md`) with metadata:
+2. Launcher quick action (app icon long-press shortcut) for directly opening Record Thought.
+3. Home screen Quick Record widget that opens Record Thought with one tap.
+4. Record Thought runs as a dedicated activity without top-level navigation chrome.
+5. Record Thought screen with speech-to-text, auto-start listening, visualizer, manual editing, and save.
+6. Cursor-aware speech insertion (transcript inserts at current cursor/selection).
+7. Raw Thoughts date browsing with edit/delete over daily raw JSON files.
+8. Daily View summary cards (one per `data/daily/*.md`) with metadata:
    - raw thought count for the same day key
    - summary word count
    - last summarized timestamp
-6. Daily summary detail screen with markdown rendering.
-7. Settings with:
+9. Daily summary detail screen with markdown rendering.
+10. Settings with:
    - Google Drive sync toggle (foundation)
    - Gemini API key save/test
    - Cloud summaries toggle visible only when Gemini key exists
-8. Gemini-powered summary generation from raw JSON using Daily View FAB actions:
+11. Gemini-powered summary generation from raw JSON using Daily View FAB actions:
    - `Summarize` FAB generates for today
    - `Calendar` FAB opens date picker for a specific day
-10. Google Drive bidirectional sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly` with conflict resolution.
-10. WorkManager background jobs:
+12. Google Drive bidirectional sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly` with conflict resolution.
+13. WorkManager background jobs:
    - periodic Drive sync
    - nightly summary regeneration with previous-day targeting
    - shared network constraints and exponential backoff
-11. Operation log history screen (accessible from Settings) to audit sync/work/settings events.
+14. Operation log history screen (accessible from Settings) to audit sync/work/settings events.
 
 Not yet implemented:
 1. Weekly and monthly summary generation pipelines.
-2. Home screen widget.
 
 ## Architecture Overview
 

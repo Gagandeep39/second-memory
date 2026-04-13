@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="record_thought_shortcut"
+        android:enabled="true"
+        android:icon="@drawable/ic_quick_record"
+        android:shortcutShortLabel="@string/shortcut_record_thought_short_label"
+        android:shortcutLongLabel="@string/shortcut_record_thought_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.secondmemory"
+            android:targetClass="com.secondmemory.RecordThoughtActivity" />
+    </shortcut>
+</shortcuts>

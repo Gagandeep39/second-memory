@@ -57,6 +57,13 @@ sealed class AppDestination(
     }
 
     companion object {
-        val topLevel = listOf(RawThoughts, DailyView, Settings)
+        /**
+         * Top-level destinations used by adaptive navigation chrome.
+         *
+         * This is computed on access to avoid JVM static initialization ordering issues
+         * with object declarations in some runtime builds.
+         */
+        val topLevel: List<AppDestination>
+            get() = listOf(RawThoughts, DailyView, Settings)
     }
 }

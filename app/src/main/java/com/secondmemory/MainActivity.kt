@@ -82,19 +82,22 @@ fun SecondMemoryApp() {
     NavigationSuiteScaffold(
         navigationSuiteItems = {
             topLevelDestinations.forEach { destination ->
+                val route = destination.route
+                val label = destination.label
+                val icon = destination.icon
                 item(
                     icon = {
                         Icon(
-                            painterResource(destination.icon),
-                            contentDescription = destination.label,
+                            painterResource(icon),
+                            contentDescription = label,
                             modifier = Modifier.size(24.dp),
                         )
                     },
-                    label = { Text(destination.label) },
-                    selected = currentRoute == destination.route,
+                    label = { Text(label) },
+                    selected = currentRoute == route,
                     onClick = {
-                        if (currentRoute != destination.route) {
-                            navController.navigate(destination.route) {
+                        if (currentRoute != route) {
+                            navController.navigate(route) {
                                 popUpTo(navController.graph.startDestinationId) {
                                     saveState = true
                                 }

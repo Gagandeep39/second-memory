@@ -1,11 +1,14 @@
 package com.secondmemory.ui.navigation
 
+import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.secondmemory.RecordThoughtActivity
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
@@ -14,7 +17,6 @@ import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.screen.dailyview.DailySummaryDetailScreen
 import com.secondmemory.ui.screen.dailyview.DailyViewScreen
 import com.secondmemory.ui.screen.rawthoughts.RawThoughtsScreen
-import com.secondmemory.ui.screen.record.RecordThoughtScreen
 import com.secondmemory.ui.screen.settings.OperationLogsScreen
 import com.secondmemory.ui.screen.settings.SettingsScreen
 import java.net.URLDecoder
@@ -32,6 +34,8 @@ fun AppNavHost(
     operationLogRepository: OperationLogRepository,
     llmSummaryClient: LlmSummaryClient,
 ) {
+    val context = LocalContext.current
+
     NavHost(
         navController = navController,
         startDestination = AppDestination.RawThoughts.route,
@@ -40,7 +44,7 @@ fun AppNavHost(
             RawThoughtsScreen(
                 thoughtRepository = thoughtRepository,
                 onRecordThought = {
-                    navController.navigate(AppDestination.RecordThought.route)
+                    context.startActivity(Intent(context, RecordThoughtActivity::class.java))
                 },
             )
         }
@@ -80,12 +84,6 @@ fun AppNavHost(
         composable(AppDestination.OperationLogs.route) {
             OperationLogsScreen(
                 operationLogRepository = operationLogRepository,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable(AppDestination.RecordThought.route) {
-            RecordThoughtScreen(
-                thoughtRepository = thoughtRepository,
                 onBack = { navController.popBackStack() },
             )
         }
