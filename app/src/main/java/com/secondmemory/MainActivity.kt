@@ -18,11 +18,16 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
 import com.secondmemory.ui.theme.SecondMemoryTheme
+import com.secondmemory.util.ensureAppDataDirectories
 
+/**
+ * Main Android activity that hosts the Compose app shell.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,11 +40,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Root composable that configures adaptive top-level navigation and dependencies.
+ */
 @PreviewScreenSizes
 @Composable
 fun SecondMemoryApp() {
     val context = LocalContext.current
-    val thoughtRepository = remember(context) { JsonThoughtRepository(context) }
+    remember(context) { ensureAppDataDirectories(context) }
+    val thoughtRepository = remember(context) {
+        JsonThoughtRepository(context)
+    }
+    val settingsRepository = remember(context) { DataStoreSettingsRepository(context) }
     val navController = rememberNavController()
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route
@@ -76,6 +88,7 @@ fun SecondMemoryApp() {
         AppNavHost(
             navController = navController,
             thoughtRepository = thoughtRepository,
+            settingsRepository = settingsRepository,
         )
     }
 }

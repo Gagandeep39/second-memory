@@ -6,12 +6,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val dayKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 
 /**
- * Returns today's date as an ISO day key used for file naming.
+ * Returns today's day key in yyyymmdd format used by raw thought files.
  */
 fun todayDayKey(): String {
-    return LocalDate.now().toString()
+    return LocalDate.now().format(dayKeyFormatter)
 }
 
 /**

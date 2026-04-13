@@ -4,6 +4,7 @@ import android.content.Context
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
+import com.secondmemory.util.rawDirectory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -82,6 +83,7 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
      */
     private fun writeDayThoughts(dayKey: String, thoughts: List<Thought>) {
         val root = JSONObject()
+            .put("schemaVersion", FILE_SCHEMA_VERSION)
         val array = JSONArray()
 
         thoughts.forEach { thought ->
@@ -98,17 +100,13 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
     }
 
     /**
-     * Returns the canonical file location for the given day key.
+     * Returns the canonical raw-thought file location for the given day key.
      */
     private fun dayFile(dayKey: String): File {
-        val dailyDir = File(context.filesDir, DAILY_DIR_NAME)
-        if (!dailyDir.exists()) {
-            dailyDir.mkdirs()
-        }
-        return File(dailyDir, "$dayKey.json")
+        return File(rawDirectory(context), "$dayKey.json")
     }
 
     private companion object {
-        const val DAILY_DIR_NAME = "daily"
+        const val FILE_SCHEMA_VERSION = 1
     }
 }
