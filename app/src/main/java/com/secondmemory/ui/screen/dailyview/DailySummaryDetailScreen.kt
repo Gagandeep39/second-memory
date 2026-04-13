@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.secondmemory.domain.repository.DailySummaryRepository
+import com.secondmemory.ui.component.MarkdownText
 import kotlinx.coroutines.launch
 
 /**
@@ -48,14 +48,23 @@ fun DailySummaryDetailScreen(
     ) {
         Text(text = fileName, style = MaterialTheme.typography.titleMedium)
 
-        Text(
-            text = if (content.isBlank()) "(Empty summary file)" else content,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (content.isBlank()) {
+            Text(
+                text = "(Empty summary file)",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            MarkdownText(
+                markdown = content,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            )
+        }
 
         Button(onClick = onBack) {
             Text("Back")

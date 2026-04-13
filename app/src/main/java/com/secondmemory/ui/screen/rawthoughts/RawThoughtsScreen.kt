@@ -27,30 +27,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.repository.ThoughtRepository
+import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatTime
+import com.secondmemory.util.shiftDayKey
 import com.secondmemory.util.todayDayKey
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 
+/**
+ * Screen that displays and edits raw thoughts from a selected date file.
+ */
 @Composable
 fun RawThoughtsScreen(
     thoughtRepository: ThoughtRepository,
     onRecordThought: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val dayKey = remember { todayDayKey() }
+    var selectedDayKey by remember { mutableStateOf(todayDayKey()) }
     var thoughts by remember { mutableStateOf(emptyList<Thought>()) }
     var editingThought by remember { mutableStateOf<Thought?>(null) }
     var editingText by remember { mutableStateOf("") }
 
     fun refreshThoughts() {
         scope.launch {
-            thoughts = thoughtRepository.listForDay(dayKey)
+            thoughts = thoughtRepository.listForDay(selectedDayKey)
                 .sortedByDescending { it.timestampMillis }
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedDayKey) {
         refreshThoughts()
     }
 
@@ -66,8 +71,24 @@ fun RawThoughtsScreen(
                 text = "Raw Thoughts",
                 style = MaterialTheme.typography.headlineMedium,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { selectedDayKey = shiftDayKey(selectedDayKey, -1) }) {
+                    Text("Prev")
+                }
+                Text(
+                    text = dayKeyDisplayText(selectedDayKey),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                TextButton(onClick = { selectedDayKey = shiftDayKey(selectedDayKey, 1) }) {
+                    Text("Next")
+                }
+                TextButton(onClick = { selectedDayKey = todayDayKey() }) {
+                    Text("Today")
+                }
+            }
             Text(
-                text = "${thoughts.size} thought(s) captured today.",
+                text = "${thoughts.size} thought(s) in $selectedDayKey.",
                 style = MaterialTheme.typography.bodyMedium,
             )
 
@@ -89,7 +110,7 @@ fun RawThoughtsScreen(
                             },
                             onDelete = {
                                 scope.launch {
-                                    thoughtRepository.deleteThought(dayKey, thought.id)
+                                    thoughtRepository.deleteThought(selectedDayKey, thought.id)
                                     refreshThoughts()
                                 }
                             },
@@ -130,7 +151,7 @@ fun RawThoughtsScreen(
                         val currentThought = editingThought ?: return@TextButton
                         scope.launch {
                             thoughtRepository.saveThought(
-                                dayKey = dayKey,
+                                dayKey = selectedDayKey,
                                 thought = currentThought.copy(text = editingText.trim()),
                             )
                             editingThought = null
