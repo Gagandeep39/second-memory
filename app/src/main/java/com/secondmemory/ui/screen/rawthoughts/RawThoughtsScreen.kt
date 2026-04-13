@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -65,8 +66,7 @@ fun RawThoughtsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(24.dp)
-                .padding(bottom = 80.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -102,7 +102,15 @@ fun RawThoughtsScreen(
                     )
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Spacer(
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
                     items(items = thoughts, key = { it.id }) { thought ->
                         ThoughtItem(
                             thought = thought,
@@ -116,6 +124,11 @@ fun RawThoughtsScreen(
                                     refreshThoughts()
                                 }
                             },
+                        )
+                    }
+                    item {
+                        Spacer(
+                            modifier = Modifier.padding(bottom = 24.dp)
                         )
                     }
                 }

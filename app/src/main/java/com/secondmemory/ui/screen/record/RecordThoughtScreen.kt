@@ -38,6 +38,7 @@ import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.UUID
 
 /**
@@ -171,6 +172,7 @@ fun RecordThoughtScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
