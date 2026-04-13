@@ -1,27 +1,164 @@
-# Appllication Overview
+# SecondMemory Technical Documentation
 
-A second memory to process and manage thoughts
+SecondMemory is an offline-first Android app for capturing raw thoughts, then generating and viewing daily markdown summaries.
 
-## Feature roadmap
+The current implementation emphasizes:
+1. File-based storage as the source of truth.
+2. Date-first access to raw and summary data.
+3. Optional cloud summarization via Gemini API.
+4. Minimal local persistence complexity (DataStore for app settings only).
 
-- Contains 2 nav items
-  - Raw Thoughts
-  - Daily View
-- Record Thought
-  - Accessible from an FAB on Raw thought screen or a homescreenwidget
-  - Consits of a visualizer which animates when we speak and a textfield to show the transcribed text (Editable text field)
-  - Option to save thought which will save the content in a json file in the daily folder with the current date as the name of the file
-  - Json will have list wite each item contianing 3 field - timestamp, text, source
-- Raw Thoughts
-  - Contains a list of raw thoughts created throught the day which is stored in json file
-  - Option to edit / delete thoughts
-- Daily View
-  - Shows list of dates and firsst few lines of the content
-  - Basically a list of all files present in daily folder
-  - Clicking on an item will open the file in markdown viewer
-- Settings
-  - Accessible from top right corner of all the screen
-  - User has an option to sync with Google Drive (Basically sync the local files with GDrive folder files)
-- Background features
-  - Daily summary generation at night
-  - Daily drive sync
+## Current Feature Status
+
+Implemented:
+1. Adaptive top-level navigation with routes for Raw Thoughts, Daily View, Settings, and Record Thought.
+2. Record Thought screen with speech-to-text, auto-start listening, visualizer, manual editing, and save.
+3. Cursor-aware speech insertion (transcript inserts at current cursor/selection).
+4. Raw Thoughts date browsing with edit/delete over daily raw JSON files.
+5. Daily View date cards with metadata:
+   - raw thought count
+   - summary availability
+   - summary word count
+   - last summarized timestamp
+6. Daily summary detail screen with markdown rendering.
+7. Settings with:
+   - Google Drive sync toggle (foundation)
+   - Gemini API key save/test
+   - Cloud summaries toggle visible only when Gemini key exists
+8. Gemini-powered summary generation from a selected date's raw JSON.
+
+Not yet implemented:
+1. Google Drive directory mirror sync engine.
+2. Background scheduled sync and summary jobs.
+3. Weekly and monthly summary generation pipelines.
+4. Home screen widget.
+
+## Architecture Overview
+
+Layers:
+1. `ui`: Compose screens, components, and navigation.
+2. `domain`: repository contracts, models, and LLM abstraction.
+3. `data`: file repositories, DataStore settings repository, Gemini client.
+4. `util`: date/time and data path utilities.
+
+Primary composition and dependency wiring:
+1. [app/src/main/java/com/secondmemory/MainActivity.kt](app/src/main/java/com/secondmemory/MainActivity.kt)
+
+Navigation graph:
+1. [app/src/main/java/com/secondmemory/ui/navigation/AppNavHost.kt](app/src/main/java/com/secondmemory/ui/navigation/AppNavHost.kt)
+2. [app/src/main/java/com/secondmemory/ui/navigation/AppDestination.kt](app/src/main/java/com/secondmemory/ui/navigation/AppDestination.kt)
+
+## Data Model and Storage
+
+Canonical storage root: `Context.filesDir/data`
+
+Directory structure:
+1. `data/raw` -> raw thoughts by day as `yyyymmdd.json`
+2. `data/daily` -> daily summaries as `yyyymmdd.md`
+3. `data/weekly` -> weekly summaries as `yyyymmx.md`
+4. `data/monthly` -> monthly summaries as `yyyymm.md`
+
+Directory bootstrap utility:
+1. [app/src/main/java/com/secondmemory/util/AppDataPaths.kt](app/src/main/java/com/secondmemory/util/AppDataPaths.kt)
+
+Raw thought JSON schema (current):
+1. root object with `schemaVersion`
+2. `thoughts` array
+3. per item:
+   - `id`
+   - `timestampMillis`
+   - `text`
+   - `source` (`SPEECH` or `MANUAL`)
+
+Raw thought repository:
+1. [app/src/main/java/com/secondmemory/data/repository/JsonThoughtRepository.kt](app/src/main/java/com/secondmemory/data/repository/JsonThoughtRepository.kt)
+
+Daily summary repository:
+1. [app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt](app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt)
+
+## Cloud Summary Flow (Gemini)
+
+User flow:
+1. Open Settings.
+2. Enter and save Gemini API key.
+3. Test Gemini key.
+4. Enable Cloud Summaries toggle.
+5. In Daily View, click Summarize for a date.
+6. App reads `data/raw/yyyymmdd.json`, calls Gemini, writes `data/daily/yyyymmdd.md`.
+
+LLM abstraction (future-ready for multiple providers):
+1. [app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt](app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt)
+
+Gemini implementation:
+1. [app/src/main/java/com/secondmemory/data/llm/GeminiLlmSummaryClient.kt](app/src/main/java/com/secondmemory/data/llm/GeminiLlmSummaryClient.kt)
+
+Settings repository and model:
+1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt)
+2. [app/src/main/java/com/secondmemory/domain/model/AppSettings.kt](app/src/main/java/com/secondmemory/domain/model/AppSettings.kt)
+
+## Screen Responsibilities
+
+Raw Thoughts:
+1. Date navigation (`Prev`, `Next`, `Today`).
+2. List/edit/delete thoughts in selected day file.
+3. FAB to Record Thought.
+4. [app/src/main/java/com/secondmemory/ui/screen/rawthoughts/RawThoughtsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/rawthoughts/RawThoughtsScreen.kt)
+
+Record Thought:
+1. Auto-start listening on open (permission-aware).
+2. Live audio visualizer.
+3. Manual edit field.
+4. Speech insertion at cursor/selection.
+5. Save to today's raw JSON.
+6. [app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt](app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt)
+
+Daily View:
+1. List raw date keys.
+2. Show metadata and summary status.
+3. Trigger summarization.
+4. Open summary detail.
+5. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt)
+
+Daily Summary Detail:
+1. Render markdown content.
+2. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailySummaryDetailScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailySummaryDetailScreen.kt)
+3. Markdown component: [app/src/main/java/com/secondmemory/ui/component/MarkdownText.kt](app/src/main/java/com/secondmemory/ui/component/MarkdownText.kt)
+
+Settings:
+1. Sync toggle.
+2. Gemini key save/test.
+3. Conditional cloud summary toggle.
+4. [app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt)
+
+## Permissions
+
+Declared in [app/src/main/AndroidManifest.xml](app/src/main/AndroidManifest.xml):
+1. `android.permission.RECORD_AUDIO`
+2. `android.permission.INTERNET`
+
+## Build and Run
+
+Build debug APK:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+## Operational Notes
+
+1. If Gemini key is not saved, cloud summary toggle is hidden.
+2. If cloud summaries are disabled, Daily View summarize action will show a guidance message.
+3. Daily summary markdown may be empty if generation fails or output is cleared.
+4. Date keys are currently formatted as `yyyymmdd`.
+
+## AI/Contributor Guidance
+
+Repository instructions for AI-assisted edits:
+1. [AGENTS.md](AGENTS.md)
+
+Important conventions:
+1. Keep thought and summary content file-based.
+2. Avoid introducing per-thought database storage.
+3. Preserve the canonical `data/` directory contract.
+4. Add or update KDoc for public Kotlin APIs when changing behavior.
+
