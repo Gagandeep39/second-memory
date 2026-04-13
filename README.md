@@ -26,12 +26,15 @@ Implemented:
    - Gemini API key save/test
    - Cloud summaries toggle visible only when Gemini key exists
 8. Gemini-powered summary generation from a selected date's raw JSON.
+9. Google Drive directory mirror sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly`.
+10. WorkManager background jobs:
+   - periodic Drive sync
+   - nightly summary regeneration with previous-day targeting
+   - shared network constraints and exponential backoff
 
 Not yet implemented:
-1. Google Drive directory mirror sync engine.
-2. Background scheduled sync and summary jobs.
-3. Weekly and monthly summary generation pipelines.
-4. Home screen widget.
+1. Weekly and monthly summary generation pipelines.
+2. Home screen widget.
 
 ## Architecture Overview
 
@@ -96,6 +99,50 @@ Settings repository and model:
 1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt)
 2. [app/src/main/java/com/secondmemory/domain/model/AppSettings.kt](app/src/main/java/com/secondmemory/domain/model/AppSettings.kt)
 
+## Drive Sync Flow
+
+Drive sync engine:
+1. [app/src/main/java/com/secondmemory/data/drive/GoogleDriveMirrorClient.kt](app/src/main/java/com/secondmemory/data/drive/GoogleDriveMirrorClient.kt)
+
+Sync repository integration:
+1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt)
+
+Current sync behavior:
+1. Mirrors app `data/` folders to Google Drive under `com.secondmemory/data`.
+2. Covers `raw`, `daily`, `weekly`, and `monthly` directories.
+3. Uses modified-time comparison with a small skew window.
+4. Creates local conflict backups when newer remote content overwrites local files.
+
+## Background Jobs (WorkManager)
+
+Work scheduling:
+1. [app/src/main/java/com/secondmemory/background/BackgroundWorkScheduler.kt](app/src/main/java/com/secondmemory/background/BackgroundWorkScheduler.kt)
+
+Workers:
+1. Drive sync worker: [app/src/main/java/com/secondmemory/background/DriveSyncWorker.kt](app/src/main/java/com/secondmemory/background/DriveSyncWorker.kt)
+2. Nightly summary worker: [app/src/main/java/com/secondmemory/background/NightlySummaryWorker.kt](app/src/main/java/com/secondmemory/background/NightlySummaryWorker.kt)
+3. Retry classifier: [app/src/main/java/com/secondmemory/background/WorkRetryPolicy.kt](app/src/main/java/com/secondmemory/background/WorkRetryPolicy.kt)
+
+Registration point:
+1. Scheduled during app startup in [app/src/main/java/com/secondmemory/MainActivity.kt](app/src/main/java/com/secondmemory/MainActivity.kt)
+
+Job definitions:
+1. Periodic Drive Sync
+   - Unique name: `periodic_drive_sync`
+   - Repeat interval: every 6 hours
+   - Runs only when Drive sync is enabled in Settings
+2. Nightly Daily Summary
+   - Unique name: `nightly_daily_summary`
+   - Repeat interval: every 24 hours
+   - Initial alignment: next local 01:15
+   - Target day: previous local day (for example, run at 01:15 on Apr 14 targets Apr 13)
+   - Regenerates summary for that previous day when raw JSON exists
+
+Shared WorkManager policy:
+1. Network constraint: connected network required.
+2. Backoff policy: exponential.
+3. Retry base delay: 30 seconds.
+
 ## Screen Responsibilities
 
 Raw Thoughts:
@@ -150,6 +197,7 @@ Build debug APK:
 2. If cloud summaries are disabled, Daily View summarize action will show a guidance message.
 3. Daily summary markdown may be empty if generation fails or output is cleared.
 4. Date keys are currently formatted as `yyyymmdd`.
+5. Nightly background summary generation always targets the previous local day.
 
 ## AI/Contributor Guidance
 
