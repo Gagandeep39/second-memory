@@ -169,6 +169,11 @@ fun SettingsScreen(
             },
         )
 
+        Text(
+            text = "Sync works bidirectionally: files are uploaded to Drive and downloaded from Drive. Files are never deleted from either location unless deleted on both devices.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+
         driveStatusMessage?.let { message ->
             Text(
                 text = message,

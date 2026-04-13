@@ -114,7 +114,7 @@ Current sync behavior (bidirectional sync):
 4. Files only on Drive are downloaded to local device.
 5. Files on both sides use modified-time comparison with a small skew window (last-write-wins).
 6. Creates local conflict backups (named `filename.conflict.{timestamp}.ext`) when newer remote content overwrites local files.
-7. No remote deletion: files are never deleted from Drive based on local-device state.
+7. **Deletion safety**: Files are never deleted from either location based on the state of the other. If a file is deleted locally, it is re-downloaded from Drive on next sync. If a file is deleted on Drive, it is re-uploaded to Drive on next sync. True deletion requires explicit deletion on both the device and Drive.
 
 ## Background Jobs (WorkManager)
 
