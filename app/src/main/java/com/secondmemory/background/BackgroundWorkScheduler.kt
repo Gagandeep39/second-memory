@@ -1,0 +1,101 @@
+package com.secondmemory.background
+
+import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.time.Duration
+import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
+
+/**
+ * Registers recurring background jobs used for sync and nightly summary generation.
+ */
+object BackgroundWorkScheduler {
+    /**
+     * Enqueues or updates all recurring background jobs with network and retry constraints.
+     */
+    fun scheduleRecurringWork(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+        workManager.enqueueUniquePeriodicWork(
+            DriveSyncWork.UNIQUE_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            createDriveSyncRequest(),
+        )
+        workManager.enqueueUniquePeriodicWork(
+            NightlySummaryWork.UNIQUE_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            createNightlySummaryRequest(),
+        )
+    }
+
+    /**
+     * Creates the periodic request used for Drive mirror sync.
+     */
+    private fun createDriveSyncRequest() = PeriodicWorkRequestBuilder<DriveSyncWorker>(
+        DriveSyncWork.REPEAT_HOURS,
+        TimeUnit.HOURS,
+    )
+        .setConstraints(networkConstraint())
+        .setBackoffCriteria(
+            BackoffPolicy.EXPONENTIAL,
+            COMMON_BACKOFF_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        .build()
+
+    /**
+     * Creates the nightly request that generates previous-day summaries.
+     */
+    private fun createNightlySummaryRequest() = PeriodicWorkRequestBuilder<NightlySummaryWorker>(
+        NightlySummaryWork.REPEAT_HOURS,
+        TimeUnit.HOURS,
+    )
+        .setInitialDelay(nextNightlyDelayMillis(), TimeUnit.MILLISECONDS)
+        .setConstraints(networkConstraint())
+        .setBackoffCriteria(
+            BackoffPolicy.EXPONENTIAL,
+            COMMON_BACKOFF_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        .build()
+
+    /**
+     * Shared network requirements for all recurring background jobs.
+     */
+    private fun networkConstraint(): Constraints {
+        return Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+    }
+
+    /**
+     * Computes delay until the next local nightly trigger time.
+     */
+    private fun nextNightlyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+        val nextTrigger = now.withHour(1).withMinute(15).withSecond(0).withNano(0)
+        val target = if (nextTrigger.isAfter(now)) nextTrigger else nextTrigger.plusDays(1)
+        return Duration.between(now, target).toMillis().coerceAtLeast(0L)
+    }
+
+    /**
+     * Constants that belong specifically to periodic Drive sync scheduling.
+     */
+    private object DriveSyncWork {
+        const val UNIQUE_NAME = "periodic_drive_sync"
+        const val REPEAT_HOURS = 6L
+    }
+
+    /**
+     * Constants that belong specifically to nightly summary scheduling.
+     */
+    private object NightlySummaryWork {
+        const val UNIQUE_NAME = "nightly_daily_summary"
+        const val REPEAT_HOURS = 24L
+    }
+
+    private const val COMMON_BACKOFF_SECONDS = 30L
+}

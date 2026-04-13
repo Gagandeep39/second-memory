@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.data.drive.GoogleDriveMirrorClient
 import com.secondmemory.data.llm.GeminiLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
@@ -35,6 +36,7 @@ import com.secondmemory.util.ensureAppDataDirectories
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BackgroundWorkScheduler.scheduleRecurringWork(this)
         enableEdgeToEdge()
         setContent {
             SecondMemoryTheme {

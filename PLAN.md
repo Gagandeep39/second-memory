@@ -18,10 +18,10 @@ This file now tracks only remaining work. Completed phases (foundation, file sto
     2. Last sync status/error.
     3. File counts uploaded/downloaded.
     4. Consent and re-auth recovery for Google Drive access.
-5. Add WorkManager jobs:
+5. [Done] Added WorkManager jobs:
     1.  Periodic background sync.
     2.  Nightly daily-summary generation trigger.
-    3.  Add retry/backoff and network constraints for background jobs.
+    3.  Added retry/backoff and network constraints for background jobs.
 
 ## Phase 5: Hardening and Release Readiness
 
