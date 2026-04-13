@@ -64,6 +64,7 @@ import org.json.JSONObject
 fun SettingsScreen(
     settingsRepository: SettingsRepository,
     llmSummaryClient: LlmSummaryClient,
+    onOpenOperationLogs: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val settings by settingsRepository.observeSettings().collectAsState(
@@ -109,6 +110,10 @@ fun SettingsScreen(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
         )
+
+        Button(onClick = onOpenOperationLogs) {
+            Text("View Operation Logs")
+        }
 
         if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
             Button(

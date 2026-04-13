@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
 import com.secondmemory.data.drive.GoogleDriveSyncClient
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.util.ensureAppDataDirectories
@@ -16,6 +17,7 @@ class DriveSyncWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    private val operationLogRepository = DataStoreOperationLogRepository(appContext)
     private val syncRepository = DataStoreSyncRepository(
         context = appContext,
         driveSyncClient = GoogleDriveSyncClient(appContext),
@@ -26,9 +28,23 @@ class DriveSyncWorker(
     )
 
     override suspend fun doWork(): Result {
+        operationLogRepository.appendLog(
+            category = "WORK",
+            action = "Drive worker started",
+            status = "STARTED",
+            details = "runAttempt=${runAttemptCount + 1}",
+            source = "DriveSyncWorker",
+        )
         ensureAppDataDirectories(applicationContext)
         val settings = settingsRepository.currentSettings()
         if (!settings.driveSyncEnabled) {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Drive worker skipped",
+                status = "SKIPPED",
+                details = "Drive sync is disabled in settings",
+                source = "DriveSyncWorker",
+            )
             return Result.success()
         }
 
@@ -37,8 +53,22 @@ class DriveSyncWorker(
                 driveSyncEnabled = true,
                 accountEmail = settings.connectedGoogleAccountEmail,
             )
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Drive worker completed",
+                status = "SUCCESS",
+                details = settings.connectedGoogleAccountEmail ?: "No connected account",
+                source = "DriveSyncWorker",
+            )
             Result.success()
         }.getOrElse { error ->
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Drive worker failed",
+                status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
+                details = error.message ?: "Background drive sync failed",
+                source = "DriveSyncWorker",
+            )
             if (shouldRetryWork(error)) {
                 Result.retry()
             } else {

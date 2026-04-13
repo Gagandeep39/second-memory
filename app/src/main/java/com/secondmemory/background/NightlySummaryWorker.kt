@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
 import com.secondmemory.data.llm.GeminiLlmSummaryClient
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
@@ -23,6 +24,7 @@ class NightlySummaryWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    private val operationLogRepository = DataStoreOperationLogRepository(appContext)
     private val settingsRepository = DataStoreSettingsRepository(
         context = appContext,
         syncRepository = DataStoreSyncRepository(
@@ -35,15 +37,36 @@ class NightlySummaryWorker(
     private val llmSummaryClient = GeminiLlmSummaryClient()
 
     override suspend fun doWork(): Result {
+        operationLogRepository.appendLog(
+            category = "WORK",
+            action = "Nightly summary worker started",
+            status = "STARTED",
+            details = "runAttempt=${runAttemptCount + 1}",
+            source = "NightlySummaryWorker",
+        )
         ensureAppDataDirectories(applicationContext)
         val settings = settingsRepository.currentSettings()
         if (!settings.cloudSummaryEnabled || settings.geminiApiKey.isBlank()) {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Nightly summary worker skipped",
+                status = "SKIPPED",
+                details = "Cloud summaries disabled or Gemini key missing",
+                source = "NightlySummaryWorker",
+            )
             return Result.success()
         }
 
         val targetDayKey = previousDayKey()
         val rawJson = thoughtRepository.readRawJson(targetDayKey)
         if (rawJson.isBlank()) {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Nightly summary worker skipped",
+                status = "SKIPPED",
+                details = "No raw thoughts for $targetDayKey",
+                source = "NightlySummaryWorker",
+            )
             return Result.success()
         }
 
@@ -54,8 +77,22 @@ class NightlySummaryWorker(
                 apiKey = settings.geminiApiKey,
             )
             dailySummaryRepository.saveSummaryForDay(targetDayKey, markdown)
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Nightly summary generated",
+                status = "SUCCESS",
+                details = targetDayKey,
+                source = "NightlySummaryWorker",
+            )
             Result.success()
         }.getOrElse { error ->
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Nightly summary worker failed",
+                status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
+                details = error.message ?: "Nightly summary generation failed",
+                source = "NightlySummaryWorker",
+            )
             if (shouldRetryWork(error)) {
                 Result.retry()
             } else {

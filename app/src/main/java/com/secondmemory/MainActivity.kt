@@ -21,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.data.llm.GeminiLlmSummaryClient
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
@@ -72,6 +73,7 @@ fun SecondMemoryApp() {
         )
     }
     val llmSummaryClient = remember { GeminiLlmSummaryClient() }
+    val operationLogRepository = remember(context) { DataStoreOperationLogRepository(context) }
     val navController = rememberNavController()
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route
@@ -110,6 +112,7 @@ fun SecondMemoryApp() {
             thoughtRepository = thoughtRepository,
             dailySummaryRepository = dailySummaryRepository,
             settingsRepository = settingsRepository,
+            operationLogRepository = operationLogRepository,
             llmSummaryClient = llmSummaryClient,
         )
     }

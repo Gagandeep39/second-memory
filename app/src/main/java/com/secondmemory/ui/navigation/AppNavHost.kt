@@ -8,12 +8,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
+import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.screen.dailyview.DailySummaryDetailScreen
 import com.secondmemory.ui.screen.dailyview.DailyViewScreen
 import com.secondmemory.ui.screen.rawthoughts.RawThoughtsScreen
 import com.secondmemory.ui.screen.record.RecordThoughtScreen
+import com.secondmemory.ui.screen.settings.OperationLogsScreen
 import com.secondmemory.ui.screen.settings.SettingsScreen
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -27,6 +29,7 @@ fun AppNavHost(
     thoughtRepository: ThoughtRepository,
     dailySummaryRepository: DailySummaryRepository,
     settingsRepository: SettingsRepository,
+    operationLogRepository: OperationLogRepository,
     llmSummaryClient: LlmSummaryClient,
 ) {
     NavHost(
@@ -69,6 +72,15 @@ fun AppNavHost(
             SettingsScreen(
                 settingsRepository = settingsRepository,
                 llmSummaryClient = llmSummaryClient,
+                onOpenOperationLogs = {
+                    navController.navigate(AppDestination.OperationLogs.route)
+                },
+            )
+        }
+        composable(AppDestination.OperationLogs.route) {
+            OperationLogsScreen(
+                operationLogRepository = operationLogRepository,
+                onBack = { navController.popBackStack() },
             )
         }
         composable(AppDestination.RecordThought.route) {

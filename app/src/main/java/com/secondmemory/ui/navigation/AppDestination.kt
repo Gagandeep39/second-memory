@@ -27,6 +27,15 @@ sealed class AppDestination(
         icon = R.drawable.ic_account_box,
     )
 
+    /**
+     * Route for the detailed operation log screen.
+     */
+    data object OperationLogs : AppDestination(
+        route = "operation_logs",
+        label = "Operation Logs",
+        icon = R.drawable.ic_favorite,
+    )
+
     data object RecordThought : AppDestination(
         route = "record_thought",
         label = "Record Thought",

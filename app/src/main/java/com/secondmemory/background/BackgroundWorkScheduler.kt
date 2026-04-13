@@ -7,6 +7,10 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
@@ -19,6 +23,7 @@ object BackgroundWorkScheduler {
      * Enqueues or updates all recurring background jobs with network and retry constraints.
      */
     fun scheduleRecurringWork(context: Context) {
+        val operationLogRepository = DataStoreOperationLogRepository(context)
         val workManager = WorkManager.getInstance(context)
         workManager.enqueueUniquePeriodicWork(
             DriveSyncWork.UNIQUE_NAME,
@@ -30,6 +35,15 @@ object BackgroundWorkScheduler {
             ExistingPeriodicWorkPolicy.UPDATE,
             createNightlySummaryRequest(),
         )
+        CoroutineScope(Dispatchers.IO).launch {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Recurring work scheduled",
+                status = "SUCCESS",
+                details = "drive=${DriveSyncWork.UNIQUE_NAME}, nightly=${NightlySummaryWork.UNIQUE_NAME}",
+                source = "BackgroundWorkScheduler",
+            )
+        }
     }
 
     /**

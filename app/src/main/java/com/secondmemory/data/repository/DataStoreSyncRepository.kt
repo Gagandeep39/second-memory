@@ -34,6 +34,8 @@ class DataStoreSyncRepository(
     private val context: Context,
     private val driveSyncClient: GoogleDriveSyncClient,
 ) : SyncRepository {
+    private val operationLogRepository = DataStoreOperationLogRepository(context)
+
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return context.syncStore.data.map { preferences ->
             preferences.toMetadata()
@@ -47,6 +49,13 @@ class DataStoreSyncRepository(
 
     override suspend fun syncNow(driveSyncEnabled: Boolean, accountEmail: String?) {
         withContext(Dispatchers.IO) {
+            operationLogRepository.appendLog(
+                category = "SYNC",
+                action = "Sync requested",
+                status = "STARTED",
+                details = "driveSyncEnabled=$driveSyncEnabled account=${accountEmail ?: "none"}",
+                source = "DataStoreSyncRepository",
+            )
             context.syncStore.edit { prefs ->
                 prefs[Keys.STATE] = SyncState.SYNCING.name
                 prefs[Keys.LAST_MESSAGE] = "Syncing local data tree to Google Drive"
@@ -80,11 +89,25 @@ class DataStoreSyncRepository(
                     prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
                     prefs[Keys.LAST_MESSAGE] = message
                 }
+                operationLogRepository.appendLog(
+                    category = "SYNC",
+                    action = "Sync completed",
+                    status = "SUCCESS",
+                    details = message,
+                    source = "DataStoreSyncRepository",
+                )
             }.onFailure { error ->
                 context.syncStore.edit { prefs ->
                     prefs[Keys.STATE] = SyncState.ERROR.name
                     prefs[Keys.LAST_MESSAGE] = error.message ?: "Sync failed"
                 }
+                operationLogRepository.appendLog(
+                    category = "SYNC",
+                    action = "Sync failed",
+                    status = "ERROR",
+                    details = error.message ?: "Unknown sync failure",
+                    source = "DataStoreSyncRepository",
+                )
                 throw error
             }
         }

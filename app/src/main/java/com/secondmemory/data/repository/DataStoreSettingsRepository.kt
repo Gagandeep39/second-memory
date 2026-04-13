@@ -27,6 +27,8 @@ class DataStoreSettingsRepository(
     private val context: Context,
     private val syncRepository: SyncRepository,
 ) : SettingsRepository {
+    private val operationLogRepository = DataStoreOperationLogRepository(context)
+
     override fun observeSettings(): Flow<AppSettings> {
         return context.appSettingsStore.data.combine(syncRepository.observeSyncMetadata()) { preferences, syncMetadata ->
             preferences.toAppSettings(syncMetadata)
@@ -43,6 +45,13 @@ class DataStoreSettingsRepository(
             val hasConnectedAccount = !(prefs[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL] ?: "").isBlank()
             prefs[Keys.DRIVE_SYNC_ENABLED] = enabled && hasConnectedAccount
         }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "Drive sync toggled",
+            status = "SUCCESS",
+            details = "enabled=$enabled",
+            source = "DataStoreSettingsRepository",
+        )
     }
 
     override suspend fun setConnectedGoogleAccountEmail(email: String?) {
@@ -53,6 +62,13 @@ class DataStoreSettingsRepository(
                 prefs[Keys.DRIVE_SYNC_ENABLED] = false
             }
         }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = if (email.isNullOrBlank()) "Google account disconnected" else "Google account connected",
+            status = "SUCCESS",
+            details = email ?: "none",
+            source = "DataStoreSettingsRepository",
+        )
     }
 
     override suspend fun setCloudSummaryEnabled(enabled: Boolean) {
@@ -60,6 +76,13 @@ class DataStoreSettingsRepository(
             val hasGeminiKey = !(prefs[Keys.GEMINI_API_KEY] ?: "").isBlank()
             prefs[Keys.CLOUD_SUMMARY_ENABLED] = enabled && hasGeminiKey
         }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "Cloud summaries toggled",
+            status = "SUCCESS",
+            details = "enabled=$enabled",
+            source = "DataStoreSettingsRepository",
+        )
     }
 
     override suspend fun setGeminiApiKey(apiKey: String) {
@@ -70,6 +93,13 @@ class DataStoreSettingsRepository(
                 prefs[Keys.CLOUD_SUMMARY_ENABLED] = false
             }
         }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "Gemini API key updated",
+            status = "SUCCESS",
+            details = if (apiKey.isBlank()) "Cleared" else "Saved",
+            source = "DataStoreSettingsRepository",
+        )
     }
 
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
@@ -82,6 +112,13 @@ class DataStoreSettingsRepository(
 
     override suspend fun syncNow() {
         val settings = currentSettings()
+        operationLogRepository.appendLog(
+            category = "SYNC",
+            action = "Manual sync triggered",
+            status = "STARTED",
+            details = settings.connectedGoogleAccountEmail ?: "No connected account",
+            source = "DataStoreSettingsRepository",
+        )
         syncRepository.syncNow(
             driveSyncEnabled = settings.driveSyncEnabled,
             accountEmail = settings.connectedGoogleAccountEmail,
