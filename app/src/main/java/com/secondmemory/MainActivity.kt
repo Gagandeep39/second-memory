@@ -22,6 +22,7 @@ import com.secondmemory.data.llm.GeminiLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
+import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
 import com.secondmemory.ui.theme.SecondMemoryTheme
@@ -54,7 +55,13 @@ fun SecondMemoryApp() {
         JsonThoughtRepository(context)
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
-    val settingsRepository = remember(context) { DataStoreSettingsRepository(context) }
+    val syncRepository = remember(context) { DataStoreSyncRepository(context) }
+    val settingsRepository = remember(context) {
+        DataStoreSettingsRepository(
+            context = context,
+            syncRepository = syncRepository,
+        )
+    }
     val llmSummaryClient = remember { GeminiLlmSummaryClient() }
     val navController = rememberNavController()
     val backStackEntry = navController.currentBackStackEntryAsState().value

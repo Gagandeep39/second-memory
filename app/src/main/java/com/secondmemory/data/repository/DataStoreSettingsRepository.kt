@@ -5,12 +5,17 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.secondmemory.domain.model.AppSettings
+import com.secondmemory.domain.model.SyncMetadata
+import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SettingsRepository
+import com.secondmemory.domain.repository.SyncRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 private val Context.appSettingsStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
@@ -18,16 +23,19 @@ private val Context.appSettingsStore: DataStore<Preferences> by preferencesDataS
 /**
  * DataStore-backed settings repository for feature toggles and preferences.
  */
-class DataStoreSettingsRepository(private val context: Context) : SettingsRepository {
+class DataStoreSettingsRepository(
+    private val context: Context,
+    private val syncRepository: SyncRepository,
+) : SettingsRepository {
     override fun observeSettings(): Flow<AppSettings> {
-        return context.appSettingsStore.data.map { preferences ->
-            preferences.toAppSettings()
+        return context.appSettingsStore.data.combine(syncRepository.observeSyncMetadata()) { preferences, syncMetadata ->
+            preferences.toAppSettings(syncMetadata)
         }
     }
 
     override suspend fun currentSettings(): AppSettings {
         val preferences = context.appSettingsStore.data.first()
-        return preferences.toAppSettings()
+        return preferences.toAppSettings(syncRepository.currentSyncMetadata())
     }
 
     override suspend fun setDriveSyncEnabled(enabled: Boolean) {
@@ -53,16 +61,31 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         }
     }
 
+    override fun observeSyncMetadata(): Flow<SyncMetadata> {
+        return syncRepository.observeSyncMetadata()
+    }
+
+    override suspend fun currentSyncMetadata(): SyncMetadata {
+        return syncRepository.currentSyncMetadata()
+    }
+
+    override suspend fun syncNow() {
+        syncRepository.syncNow()
+    }
+
     /**
      * Maps datastore preferences to strongly typed app settings.
      */
-    private fun Preferences.toAppSettings(): AppSettings {
+    private fun Preferences.toAppSettings(syncMetadata: SyncMetadata): AppSettings {
         val geminiKey = this[Keys.GEMINI_API_KEY] ?: ""
         val cloudEnabled = (this[Keys.CLOUD_SUMMARY_ENABLED] ?: true) && geminiKey.isNotBlank()
         return AppSettings(
             driveSyncEnabled = this[Keys.DRIVE_SYNC_ENABLED] ?: false,
             cloudSummaryEnabled = cloudEnabled,
             geminiApiKey = geminiKey,
+            syncState = syncMetadata.state,
+            lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
+            lastSyncMessage = syncMetadata.lastSyncMessage,
         )
     }
 

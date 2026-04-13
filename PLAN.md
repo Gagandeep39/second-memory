@@ -4,7 +4,7 @@ This file now tracks only remaining work. Completed phases (foundation, file sto
 
 ## Phase 4: Sync and Background
 
-1. Implement Google Drive directory mirror for local `data/`.
+1. Implement Google Drive directory mirror for local `data/`. It must be present inside com.secondmemory app-specific storage to avoid permission issues.
 2. Sync scope must include:
    1. `data/raw`
    2. `data/daily`

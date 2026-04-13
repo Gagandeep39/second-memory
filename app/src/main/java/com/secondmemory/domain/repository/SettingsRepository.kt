@@ -1,6 +1,7 @@
 package com.secondmemory.domain.repository
 
 import com.secondmemory.domain.model.AppSettings
+import com.secondmemory.domain.model.SyncMetadata
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -31,4 +32,19 @@ interface SettingsRepository {
      * Stores a Gemini API key used for cloud summary generation.
      */
     suspend fun setGeminiApiKey(apiKey: String)
+
+    /**
+     * Streams the current sync metadata and subsequent updates.
+     */
+    fun observeSyncMetadata(): Flow<SyncMetadata>
+
+    /**
+     * Returns the current sync metadata snapshot.
+     */
+    suspend fun currentSyncMetadata(): SyncMetadata
+
+    /**
+     * Starts a manual sync operation.
+     */
+    suspend fun syncNow()
 }

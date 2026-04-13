@@ -20,17 +20,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.model.AppSettings
+import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SettingsRepository
+import com.secondmemory.util.formatDateTime
 import kotlinx.coroutines.launch
-import androidx.compose.ui.unit.dp
 
 /**
- * Screen that exposes persisted app-level feature toggles.
+ * Screen that exposes persisted app-level feature toggles and sync controls.
  */
 @Composable
 fun SettingsScreen(
@@ -43,6 +45,9 @@ fun SettingsScreen(
             driveSyncEnabled = false,
             cloudSummaryEnabled = false,
             geminiApiKey = "",
+            syncState = SyncState.IDLE,
+            lastSyncAtMillis = null,
+            lastSyncMessage = null,
         )
     )
     var geminiApiKeyDraft by remember(settings.geminiApiKey) {
@@ -60,6 +65,7 @@ fun SettingsScreen(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
         )
+
         SettingToggleRow(
             title = "Google Drive Sync",
             description = "Enable synchronization of local daily files to Drive.",
@@ -70,6 +76,43 @@ fun SettingsScreen(
                 }
             },
         )
+
+        Text(
+            text = "Sync Status",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = when (settings.syncState) {
+                SyncState.IDLE -> "Idle"
+                SyncState.SYNCING -> "Syncing now"
+                SyncState.SUCCESS -> "Last sync succeeded"
+                SyncState.ERROR -> "Last sync failed"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        settings.lastSyncAtMillis?.let { timestamp ->
+            Text(
+                text = "Last sync time: ${formatDateTime(timestamp)}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        settings.lastSyncMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+
+        Button(
+            enabled = settings.driveSyncEnabled,
+            onClick = {
+                scope.launch {
+                    settingsRepository.syncNow()
+                }
+            },
+        ) {
+            Text("Sync Now")
+        }
 
         OutlinedTextField(
             value = geminiApiKeyDraft,

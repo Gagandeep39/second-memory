@@ -1,0 +1,126 @@
+package com.secondmemory.data.repository
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.secondmemory.domain.model.SyncMetadata
+import com.secondmemory.domain.model.SyncState
+import com.secondmemory.domain.repository.SyncRepository
+import com.secondmemory.util.dailyDirectory
+import com.secondmemory.util.monthlyDirectory
+import com.secondmemory.util.rawDirectory
+import com.secondmemory.util.weeklyDirectory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.io.File
+
+private val Context.syncStore: DataStore<Preferences> by preferencesDataStore(name = "sync_state")
+
+/**
+ * DataStore-backed sync repository that tracks sync status and performs local sync planning.
+ *
+ * The actual remote Drive upload/download implementation can be swapped in later without
+ * changing the UI or sync state contract.
+ */
+class DataStoreSyncRepository(private val context: Context) : SyncRepository {
+    override fun observeSyncMetadata(): Flow<SyncMetadata> {
+        return context.syncStore.data.map { preferences ->
+            preferences.toMetadata()
+        }
+    }
+
+    override suspend fun currentSyncMetadata(): SyncMetadata {
+        val preferences = context.syncStore.data.first()
+        return preferences.toMetadata()
+    }
+
+    override suspend fun syncNow() {
+        withContext(Dispatchers.IO) {
+        context.syncStore.edit { prefs ->
+            prefs[Keys.STATE] = SyncState.SYNCING.name
+            prefs[Keys.LAST_MESSAGE] = "Preparing local sync plan"
+        }
+
+        runCatching {
+            val stats = scanLocalTree()
+            val message = buildString {
+                append("Local sync scan complete: ")
+                append(stats.rawCount)
+                append(" raw, ")
+                append(stats.dailyCount)
+                append(" daily, ")
+                append(stats.weeklyCount)
+                append(" weekly, ")
+                append(stats.monthlyCount)
+                append(" monthly file(s)")
+            }
+            context.syncStore.edit { prefs ->
+                prefs[Keys.STATE] = SyncState.SUCCESS.name
+                prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
+                prefs[Keys.LAST_MESSAGE] = message
+            }
+        }.onFailure { error ->
+            context.syncStore.edit { prefs ->
+                prefs[Keys.STATE] = SyncState.ERROR.name
+                prefs[Keys.LAST_MESSAGE] = error.message ?: "Sync failed"
+            }
+        }
+        }
+    }
+
+    /**
+     * Maps preferences into sync metadata with safe defaults.
+     */
+    private fun Preferences.toMetadata(): SyncMetadata {
+        val state = runCatching {
+            SyncState.valueOf(this[Keys.STATE] ?: SyncState.IDLE.name)
+        }.getOrDefault(SyncState.IDLE)
+
+        return SyncMetadata(
+            state = state,
+            lastSyncAtMillis = this[Keys.LAST_SYNC_AT],
+            lastSyncMessage = this[Keys.LAST_MESSAGE],
+        )
+    }
+
+    /**
+     * Scans local app data folders for a lightweight sync plan preview.
+     */
+    private fun scanLocalTree(): LocalTreeStats {
+        return LocalTreeStats(
+            rawCount = countFiles(rawDirectory(context), "json"),
+            dailyCount = countFiles(dailyDirectory(context), "md"),
+            weeklyCount = countFiles(weeklyDirectory(context), "md"),
+            monthlyCount = countFiles(monthlyDirectory(context), "md"),
+        )
+    }
+
+    /**
+     * Counts files of a specific extension in a directory.
+     */
+    private fun countFiles(directory: File, extension: String): Int {
+        return directory.listFiles { file -> file.isFile && file.extension.equals(extension, ignoreCase = true) }
+            .orEmpty()
+            .size
+    }
+
+    private data class LocalTreeStats(
+        val rawCount: Int,
+        val dailyCount: Int,
+        val weeklyCount: Int,
+        val monthlyCount: Int,
+    )
+
+    private object Keys {
+        val STATE = stringPreferencesKey("sync_state")
+        val LAST_SYNC_AT = longPreferencesKey("sync_last_at")
+        val LAST_MESSAGE = stringPreferencesKey("sync_last_message")
+    }
+}
