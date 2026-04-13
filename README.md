@@ -6,7 +6,7 @@ The current implementation emphasizes:
 1. File-based storage as the source of truth.
 2. Date-first access to raw and summary data.
 3. Optional cloud summarization via Gemini API.
-4. Minimal local persistence complexity (DataStore for app settings only).
+4. Minimal local persistence complexity (DataStore for app settings and operation logs).
 
 ## Current Feature Status
 
@@ -32,6 +32,7 @@ Implemented:
    - periodic Drive sync
    - nightly summary regeneration with previous-day targeting
    - shared network constraints and exponential backoff
+11. Operation log history screen (accessible from Settings) to audit sync/work/settings events.
 
 Not yet implemented:
 1. Weekly and monthly summary generation pipelines.
@@ -42,7 +43,7 @@ Not yet implemented:
 Layers:
 1. `ui`: Compose screens, components, and navigation.
 2. `domain`: repository contracts, models, and LLM abstraction.
-3. `data`: file repositories, DataStore settings repository, Gemini client.
+3. `data`: file repositories, DataStore settings/sync/operation-log repositories, Gemini client.
 4. `util`: date/time and data path utilities.
 
 Primary composition and dependency wiring:
@@ -99,6 +100,10 @@ Gemini implementation:
 Settings repository and model:
 1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt)
 2. [app/src/main/java/com/secondmemory/domain/model/AppSettings.kt](app/src/main/java/com/secondmemory/domain/model/AppSettings.kt)
+
+Operation log repository and model:
+1. [app/src/main/java/com/secondmemory/data/repository/DataStoreOperationLogRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreOperationLogRepository.kt)
+2. [app/src/main/java/com/secondmemory/domain/model/OperationLogEntry.kt](app/src/main/java/com/secondmemory/domain/model/OperationLogEntry.kt)
 
 ## Drive Sync Flow
 
@@ -180,7 +185,9 @@ Settings:
 1. Sync toggle.
 2. Gemini key save/test.
 3. Conditional cloud summary toggle.
-4. [app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt)
+4. Operation logs entry point and screen.
+5. [app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt)
+6. [app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt)
 
 ## Permissions
 
