@@ -4,21 +4,28 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.screen.dailyview.DailyViewScreen
 import com.secondmemory.ui.screen.rawthoughts.RawThoughtsScreen
 import com.secondmemory.ui.screen.record.RecordThoughtScreen
 import com.secondmemory.ui.screen.settings.SettingsScreen
 
 @Composable
-fun AppNavHost(navController: NavHostController) {
+fun AppNavHost(
+    navController: NavHostController,
+    thoughtRepository: ThoughtRepository,
+) {
     NavHost(
         navController = navController,
         startDestination = AppDestination.RawThoughts.route,
     ) {
         composable(AppDestination.RawThoughts.route) {
-            RawThoughtsScreen(onRecordThought = {
-                navController.navigate(AppDestination.RecordThought.route)
-            })
+            RawThoughtsScreen(
+                thoughtRepository = thoughtRepository,
+                onRecordThought = {
+                    navController.navigate(AppDestination.RecordThought.route)
+                },
+            )
         }
         composable(AppDestination.DailyView.route) {
             DailyViewScreen()
@@ -27,7 +34,10 @@ fun AppNavHost(navController: NavHostController) {
             SettingsScreen()
         }
         composable(AppDestination.RecordThought.route) {
-            RecordThoughtScreen(onBack = { navController.popBackStack() })
+            RecordThoughtScreen(
+                thoughtRepository = thoughtRepository,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
