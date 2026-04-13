@@ -4,21 +4,24 @@ This file now tracks only remaining work. Completed phases (foundation, file sto
 
 ## Phase 4: Sync and Background
 
-1. Harden the Google Drive directory mirror for local `data/`.
+1. Harden the Google Drive directory Sync for local `data/`.
 2. Sync scope must continue to include:
    1. `data/raw`
    2. `data/daily`
    3. `data/weekly`
    4. `data/monthly`
-3. Harden the deterministic sync strategy:
-   1. Compare by relative path + modified time + size/hash.
-   2. Use last-write-wins for v1.
+3. Hardened bidirectional sync strategy:
+   1. Compare by relative path + modified time.
+   2. Upload local-only files to Drive.
+   3. Download remote-only files to local device.
+   4. Use last-write-wins for conflicting files (newer timestamp overwrites).
+   5. Never delete files from Drive based on local device state.
 4. Finish sync diagnostics and recovery UX in Settings:
     1. Last sync time.
     2. Last sync status/error.
     3. File counts uploaded/downloaded.
     4. Consent and re-auth recovery for Google Drive access.
-5. [Done] Added WorkManager jobs:
+5. Added WorkManager jobs:
     1.  Periodic background sync.
     2.  Nightly daily-summary generation trigger.
     3.  Added retry/backoff and network constraints for background jobs.

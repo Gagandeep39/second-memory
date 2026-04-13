@@ -203,7 +203,9 @@ fun SettingsScreen(
         }
 
         Button(
-            enabled = settings.driveSyncEnabled && !settings.connectedGoogleAccountEmail.isNullOrBlank(),
+            enabled = settings.driveSyncEnabled &&
+                !settings.connectedGoogleAccountEmail.isNullOrBlank() &&
+                settings.syncState != SyncState.SYNCING,
             onClick = {
                 scope.launch {
                     runCatching {

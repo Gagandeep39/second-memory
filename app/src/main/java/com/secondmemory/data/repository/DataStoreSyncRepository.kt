@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.secondmemory.data.drive.GoogleDriveMirrorClient
+import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.domain.model.SyncMetadata
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SyncRepository
@@ -32,7 +32,7 @@ private val Context.syncStore: DataStore<Preferences> by preferencesDataStore(na
  */
 class DataStoreSyncRepository(
     private val context: Context,
-    private val driveMirrorClient: GoogleDriveMirrorClient,
+    private val driveSyncClient: GoogleDriveSyncClient,
 ) : SyncRepository {
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return context.syncStore.data.map { preferences ->
@@ -58,7 +58,7 @@ class DataStoreSyncRepository(
 
             runCatching {
                 val message = if (driveSyncEnabled) {
-                    val report = driveMirrorClient.syncLocalDataTree(accountEmail)
+                    val report = driveSyncClient.syncLocalDataTree(accountEmail)
                     buildString {
                         append("Google Drive sync complete: ")
                         append(report.uploadedCount)

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
-import com.secondmemory.data.drive.GoogleDriveMirrorClient
+import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.util.ensureAppDataDirectories
@@ -18,7 +18,7 @@ class DriveSyncWorker(
 ) : CoroutineWorker(appContext, params) {
     private val syncRepository = DataStoreSyncRepository(
         context = appContext,
-        driveMirrorClient = GoogleDriveMirrorClient(appContext),
+        driveSyncClient = GoogleDriveSyncClient(appContext),
     )
     private val settingsRepository = DataStoreSettingsRepository(
         context = appContext,

@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.secondmemory.background.BackgroundWorkScheduler
-import com.secondmemory.data.drive.GoogleDriveMirrorClient
+import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.data.llm.GeminiLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
@@ -58,11 +58,11 @@ fun SecondMemoryApp() {
         JsonThoughtRepository(context)
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
-    val driveMirrorClient = remember(context) { GoogleDriveMirrorClient(context) }
+    val driveSyncClient = remember(context) { GoogleDriveSyncClient(context) }
     val syncRepository = remember(context) {
         DataStoreSyncRepository(
             context = context,
-            driveMirrorClient = driveMirrorClient,
+            driveSyncClient = driveSyncClient,
         )
     }
     val settingsRepository = remember(context) {

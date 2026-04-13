@@ -9,7 +9,7 @@ import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
-import com.secondmemory.data.drive.GoogleDriveMirrorClient
+import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.util.ensureAppDataDirectories
 import com.secondmemory.util.shiftDayKey
 import com.secondmemory.util.todayDayKey
@@ -27,7 +27,7 @@ class NightlySummaryWorker(
         context = appContext,
         syncRepository = DataStoreSyncRepository(
             context = appContext,
-            driveMirrorClient = GoogleDriveMirrorClient(appContext),
+            driveSyncClient = GoogleDriveSyncClient(appContext),
         ),
     )
     private val thoughtRepository = JsonThoughtRepository(appContext)

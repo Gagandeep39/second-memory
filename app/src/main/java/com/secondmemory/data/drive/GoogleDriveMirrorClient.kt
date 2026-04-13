@@ -21,13 +21,21 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 /**
- * Mirrors the local app data tree with Google Drive using the official Drive SDK.
+ * Syncs app data bidirectionally with Google Drive using the official Drive SDK.
+ *
+ * Sync behavior:
+ * - Files only on local device are uploaded to Drive.
+ * - Files only on Drive are downloaded to local device.
+ * - When files exist on both sides, the newer timestamp (with a small skew tolerance) wins.
+ * - Newer remote files create a local backup before overwriting.
+ * - Remote files are never deleted based on local device state.
  */
-class GoogleDriveMirrorClient(
+class GoogleDriveSyncClient(
     private val context: Context,
 ) {
     /**
-     * Syncs local app files and remote Drive files for the connected Google account.
+     * Syncs local app files and remote Drive files bidirectionally for the connected Google account.
+     * Downloads remote-only files, uploads local-only files, and resolves conflicts by timestamp.
      */
     suspend fun syncLocalDataTree(accountEmail: String?): DriveSyncReport = withContext(Dispatchers.IO) {
         val selectedEmail = accountEmail?.takeIf { it.isNotBlank() }
@@ -72,8 +80,9 @@ class GoogleDriveMirrorClient(
             }
 
             (remoteNames - localNames).forEach { name ->
-                deleteRemoteFile(driveService, remoteByName.getValue(name).id)
-                deleted += 1
+                val localFile = java.io.File(localDir, name)
+                downloadRemoteFile(driveService, remoteByName.getValue(name).id, localFile)
+                downloaded += 1
             }
 
             (localNames intersect remoteNames).forEach { name ->

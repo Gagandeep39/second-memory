@@ -26,7 +26,7 @@ Implemented:
    - Gemini API key save/test
    - Cloud summaries toggle visible only when Gemini key exists
 8. Gemini-powered summary generation from a selected date's raw JSON.
-9. Google Drive directory mirror sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly`.
+10. Google Drive bidirectional sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly` with conflict resolution.
 10. WorkManager background jobs:
    - periodic Drive sync
    - nightly summary regeneration with previous-day targeting
@@ -102,16 +102,19 @@ Settings repository and model:
 ## Drive Sync Flow
 
 Drive sync engine:
-1. [app/src/main/java/com/secondmemory/data/drive/GoogleDriveMirrorClient.kt](app/src/main/java/com/secondmemory/data/drive/GoogleDriveMirrorClient.kt)
+1. [app/src/main/java/com/secondmemory/data/drive/GoogleDriveSyncClient.kt](app/src/main/java/com/secondmemory/data/drive/GoogleDriveSyncClient.kt)
 
 Sync repository integration:
 1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt)
 
-Current sync behavior:
-1. Mirrors app `data/` folders to Google Drive under `com.secondmemory/data`.
+Current sync behavior (bidirectional sync):
+1. Syncs app `data/` folders bidirectionally with Google Drive under `com.secondmemory/data`.
 2. Covers `raw`, `daily`, `weekly`, and `monthly` directories.
-3. Uses modified-time comparison with a small skew window.
-4. Creates local conflict backups when newer remote content overwrites local files.
+3. Files only on local device are uploaded to Drive.
+4. Files only on Drive are downloaded to local device.
+5. Files on both sides use modified-time comparison with a small skew window (last-write-wins).
+6. Creates local conflict backups (named `filename.conflict.{timestamp}.ext`) when newer remote content overwrites local files.
+7. No remote deletion: files are never deleted from Drive based on local-device state.
 
 ## Background Jobs (WorkManager)
 
