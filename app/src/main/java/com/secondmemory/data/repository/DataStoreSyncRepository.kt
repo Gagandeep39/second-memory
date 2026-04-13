@@ -49,40 +49,30 @@ class DataStoreSyncRepository(
         withContext(Dispatchers.IO) {
             context.syncStore.edit { prefs ->
                 prefs[Keys.STATE] = SyncState.SYNCING.name
-                prefs[Keys.LAST_MESSAGE] = if (driveSyncEnabled) {
-                    "Syncing local data tree to Google Drive"
-                } else {
-                    "Preparing local sync plan"
-                }
+                prefs[Keys.LAST_MESSAGE] = "Syncing local data tree to Google Drive"
             }
 
             runCatching {
-                val message = if (driveSyncEnabled) {
-                    val report = driveSyncClient.syncLocalDataTree(accountEmail)
-                    buildString {
-                        append("Google Drive sync complete: ")
-                        append(report.uploadedCount)
-                        append(" uploaded, ")
-                        append(report.downloadedCount)
-                        append(" downloaded, ")
-                        append(report.deletedCount)
-                        append(" deleted, ")
-                        append(report.conflictedCount)
-                        append(" conflicted")
-                    }
-                } else {
-                    val stats = scanLocalTree()
-                    buildString {
-                        append("Local sync scan complete: ")
-                        append(stats.rawCount)
-                        append(" raw, ")
-                        append(stats.dailyCount)
-                        append(" daily, ")
-                        append(stats.weeklyCount)
-                        append(" weekly, ")
-                        append(stats.monthlyCount)
-                        append(" monthly file(s)")
-                    }
+                val report = driveSyncClient.syncLocalDataTree(accountEmail)
+                val stats = scanLocalTree()
+                val message = buildString {
+                    append("Google Drive sync complete: ")
+                    append(report.uploadedCount)
+                    append(" uploaded, ")
+                    append(report.downloadedCount)
+                    append(" downloaded, ")
+                    append(report.deletedCount)
+                    append(" deleted, ")
+                    append(report.conflictedCount)
+                    append(" conflicted. Local files: ")
+                    append(stats.rawCount)
+                    append(" raw, ")
+                    append(stats.dailyCount)
+                    append(" daily, ")
+                    append(stats.weeklyCount)
+                    append(" weekly, ")
+                    append(stats.monthlyCount)
+                    append(" monthly")
                 }
 
                 context.syncStore.edit { prefs ->
