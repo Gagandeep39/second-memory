@@ -15,9 +15,8 @@ Implemented:
 2. Record Thought screen with speech-to-text, auto-start listening, visualizer, manual editing, and save.
 3. Cursor-aware speech insertion (transcript inserts at current cursor/selection).
 4. Raw Thoughts date browsing with edit/delete over daily raw JSON files.
-5. Daily View date cards with metadata:
-   - raw thought count
-   - summary availability
+5. Daily View summary cards (one per `data/daily/*.md`) with metadata:
+   - raw thought count for the same day key
    - summary word count
    - last summarized timestamp
 6. Daily summary detail screen with markdown rendering.
@@ -25,7 +24,9 @@ Implemented:
    - Google Drive sync toggle (foundation)
    - Gemini API key save/test
    - Cloud summaries toggle visible only when Gemini key exists
-8. Gemini-powered summary generation from a selected date's raw JSON.
+8. Gemini-powered summary generation from raw JSON using Daily View FAB actions:
+   - `Summarize` FAB generates for today
+   - `Calendar` FAB opens date picker for a specific day
 10. Google Drive bidirectional sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly` with conflict resolution.
 10. WorkManager background jobs:
    - periodic Drive sync
@@ -86,7 +87,7 @@ User flow:
 2. Enter and save Gemini API key.
 3. Test Gemini key.
 4. Enable Cloud Summaries toggle.
-5. In Daily View, click Summarize for a date.
+5. In Daily View, either tap `Summarize` for today or use `Calendar` to pick a specific date.
 6. App reads `data/raw/yyyymmdd.json`, calls Gemini, writes `data/daily/yyyymmdd.md`.
 
 LLM abstraction (future-ready for multiple providers):
@@ -163,10 +164,11 @@ Record Thought:
 6. [app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt](app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt)
 
 Daily View:
-1. List raw date keys.
-2. Show metadata and summary status.
-3. Trigger summarization.
-4. Open summary detail.
+1. List daily summary markdown files (`data/daily/*.md`) by day key.
+2. Show metadata (raw thought count, summary word count, last summarized time).
+3. Trigger summarization for today via `Summarize` FAB or for a selected day via `Calendar` FAB.
+4. Collapse `Summarize` extended FAB text when the list is scrolled.
+5. Open summary detail.
 5. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt)
 
 Daily Summary Detail:

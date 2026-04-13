@@ -8,6 +8,7 @@ These rules apply to any AI-assisted code changes in this repository.
 - Every non-trivial private helper should include a short KDoc comment describing purpose.
 - If logic has constraints or side effects, document assumptions directly above the code.
 - Keep documentation accurate when behavior changes. Updating code without updating docs is not allowed.
+- Any major code change must also update technical documentation in README when needed.
 
 ## Implementation Standards
 
