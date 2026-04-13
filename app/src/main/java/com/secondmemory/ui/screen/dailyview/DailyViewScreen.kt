@@ -25,6 +25,8 @@ import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
+import com.secondmemory.util.dayKeyDisplayText
+import com.secondmemory.util.formatDateTime
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 
@@ -48,11 +50,15 @@ fun DailyViewScreen(
         scope.launch {
             val dayKeys = thoughtRepository.listAvailableDayKeys()
             dayItems = dayKeys.map { dayKey ->
+                val thoughtCount = thoughtRepository.listForDay(dayKey).size
                 val markdown = dailySummaryRepository.readSummaryForDay(dayKey)
+                val lastUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(dayKey)
                 DaySummaryItem(
                     dayKey = dayKey,
                     hasSummary = markdown.isNotBlank(),
-                    preview = markdown.lineSequence().firstOrNull { it.isNotBlank() } ?: "(No summary yet)",
+                    thoughtCount = thoughtCount,
+                    summaryWordCount = markdown.wordCount(),
+                    summaryLastUpdatedMillis = lastUpdatedMillis,
                     fileName = dailySummaryRepository.summaryFileName(dayKey),
                 )
             }
@@ -153,8 +159,25 @@ private fun DailySummaryItem(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(text = item.dayKey, style = MaterialTheme.typography.titleMedium)
-            Text(text = item.preview, style = MaterialTheme.typography.bodyMedium)
+            Text(text = dayKeyDisplayText(item.dayKey), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Raw thoughts: ${item.thoughtCount}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = if (item.hasSummary) {
+                    "Summary: ready (${item.summaryWordCount} words)"
+                } else {
+                    "Summary: not generated yet"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (item.summaryLastUpdatedMillis != null) {
+                Text(
+                    text = "Last summarized: ${formatDateTime(item.summaryLastUpdatedMillis)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = !isBusy,
@@ -178,6 +201,16 @@ private fun DailySummaryItem(
 private data class DaySummaryItem(
     val dayKey: String,
     val hasSummary: Boolean,
-    val preview: String,
+    val thoughtCount: Int,
+    val summaryWordCount: Int,
+    val summaryLastUpdatedMillis: Long?,
     val fileName: String,
 )
+
+/**
+ * Counts words in markdown text for quick metadata display.
+ */
+private fun String.wordCount(): Int {
+    if (isBlank()) return 0
+    return trim().split(Regex("\\s+")).count { token -> token.isNotBlank() }
+}

@@ -22,7 +22,7 @@ class FileDailySummaryRepository(private val context: Context) : DailySummaryRep
             DailySummaryFile(
                 fileName = file.name,
                 dayKey = file.nameWithoutExtension,
-                preview = file.previewLine(),
+                preview = "",
             )
         }
     }
@@ -49,16 +49,10 @@ class FileDailySummaryRepository(private val context: Context) : DailySummaryRep
         return "$dayKey.md"
     }
 
-    /**
-     * Returns the first non-empty line as a preview snippet.
-     */
-    private fun File.previewLine(): String {
-        return useLines { sequence ->
-            sequence.firstOrNull { line -> line.isNotBlank() }
-        }?.take(PREVIEW_MAX_CHARS) ?: "(No content yet)"
+    override suspend fun lastUpdatedMillisForDay(dayKey: String): Long? = withContext(Dispatchers.IO) {
+        val summaryFile = File(dailyDirectory(context), summaryFileName(dayKey))
+        if (!summaryFile.exists() || !summaryFile.isFile) return@withContext null
+        summaryFile.lastModified()
     }
 
-    private companion object {
-        const val PREVIEW_MAX_CHARS = 140
-    }
 }

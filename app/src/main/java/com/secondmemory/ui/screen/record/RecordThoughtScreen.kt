@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
@@ -47,11 +50,12 @@ fun RecordThoughtScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var draftText by remember { mutableStateOf("") }
+    var draftTextFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     var isListening by remember { mutableStateOf(false) }
     var hasSpeechInput by remember { mutableStateOf(false) }
     var rmsLevel by remember { mutableStateOf(0f) }
-    var speechStatus by remember { mutableStateOf("Tap Start Listening to dictate your thought.") }
+    var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
+    var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
 
     val speechRecognizer = remember(context) {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -73,6 +77,7 @@ fun RecordThoughtScreen(
             speechStatus = "Speech recognition is not available on this device."
             return
         }
+        listeningBaseValue = draftTextFieldValue
         speechStatus = "Listening..."
         isListening = true
         speechRecognizer.startListening(speechIntent)
@@ -122,7 +127,7 @@ fun RecordThoughtScreen(
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull()
                     if (!topMatch.isNullOrBlank()) {
-                        draftText = topMatch
+                        draftTextFieldValue = appendTranscript(listeningBaseValue, topMatch)
                         hasSpeechInput = true
                         speechStatus = "Transcription complete. You can edit before saving."
                     } else {
@@ -137,7 +142,7 @@ fun RecordThoughtScreen(
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull()
                     if (!partial.isNullOrBlank()) {
-                        draftText = partial
+                        draftTextFieldValue = appendTranscript(listeningBaseValue, partial)
                     }
                 }
 
@@ -147,6 +152,19 @@ fun RecordThoughtScreen(
 
         onDispose {
             speechRecognizer?.destroy()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val isGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (isGranted) {
+            beginListening()
+        } else {
+            requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -195,8 +213,8 @@ fun RecordThoughtScreen(
         }
 
         OutlinedTextField(
-            value = draftText,
-            onValueChange = { draftText = it },
+            value = draftTextFieldValue,
+            onValueChange = { draftTextFieldValue = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -204,7 +222,7 @@ fun RecordThoughtScreen(
         )
 
         Button(
-            enabled = draftText.isNotBlank(),
+            enabled = draftTextFieldValue.text.isNotBlank(),
             onClick = {
                 scope.launch {
                     thoughtRepository.saveThought(
@@ -212,7 +230,7 @@ fun RecordThoughtScreen(
                         thought = Thought(
                             id = UUID.randomUUID().toString(),
                             timestampMillis = System.currentTimeMillis(),
-                            text = draftText.trim(),
+                            text = draftTextFieldValue.text.trim(),
                             source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
                         ),
                     )
@@ -234,4 +252,35 @@ fun RecordThoughtScreen(
  */
 private fun normalizeRmsLevel(rmsdB: Float): Float {
     return ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+}
+
+/**
+ * Inserts transcript at the current cursor or selection and moves cursor to inserted end.
+ */
+private fun appendTranscript(
+    baseValue: TextFieldValue,
+    transcript: String,
+): TextFieldValue {
+    val cleanTranscript = transcript.trim()
+    if (cleanTranscript.isBlank()) return baseValue
+
+    val text = baseValue.text
+    val start = baseValue.selection.min.coerceIn(0, text.length)
+    val end = baseValue.selection.max.coerceIn(start, text.length)
+
+    val prefix = text.substring(0, start)
+    val suffix = text.substring(end)
+
+    val needsLeadingSpace = prefix.isNotBlank() && !prefix.last().isWhitespace()
+    val needsTrailingSpace = suffix.isNotBlank() && !suffix.first().isWhitespace()
+
+    val inserted = buildString {
+        if (needsLeadingSpace) append(' ')
+        append(cleanTranscript)
+        if (needsTrailingSpace) append(' ')
+    }
+
+    val newText = prefix + inserted + suffix
+    val cursor = (prefix.length + inserted.length).coerceAtMost(newText.length)
+    return TextFieldValue(text = newText, selection = TextRange(cursor))
 }

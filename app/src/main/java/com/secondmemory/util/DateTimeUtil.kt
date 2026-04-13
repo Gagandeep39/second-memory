@@ -9,6 +9,7 @@ import java.time.format.DateTimeParseException
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val dayKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 private val displayDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+private val displayDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")
 
 /**
  * Returns today's day key in yyyymmdd format used by raw thought files.
@@ -52,4 +53,14 @@ fun formatTime(timestampMillis: Long): String {
         .atZone(ZoneId.systemDefault())
         .toLocalTime()
         .format(timeFormatter)
+}
+
+/**
+ * Formats epoch milliseconds into a local date-time string.
+ */
+fun formatDateTime(timestampMillis: Long): String {
+    return Instant.ofEpochMilli(timestampMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDateTime()
+        .format(displayDateTimeFormatter)
 }

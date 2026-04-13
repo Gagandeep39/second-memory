@@ -30,4 +30,9 @@ interface DailySummaryRepository {
      * Returns the summary markdown file name for a day key.
      */
     fun summaryFileName(dayKey: String): String
+
+    /**
+     * Returns last modified epoch millis for a day summary file, or null if missing.
+     */
+    suspend fun lastUpdatedMillisForDay(dayKey: String): Long?
 }
