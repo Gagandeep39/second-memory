@@ -1,20 +1,33 @@
 package com.secondmemory.ui.screen.record
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
@@ -23,13 +36,112 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 
+/**
+ * Screen used to capture a thought by typing or speech transcription and persist it for today.
+ */
 @Composable
 fun RecordThoughtScreen(
     thoughtRepository: ThoughtRepository,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var draftText by remember { mutableStateOf("") }
+    var isListening by remember { mutableStateOf(false) }
+    var hasSpeechInput by remember { mutableStateOf(false) }
+    var speechStatus by remember { mutableStateOf("Tap Start Listening to dictate your thought.") }
+
+    val speechRecognizer = remember(context) {
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        } else {
+            null
+        }
+    }
+
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        }
+    }
+
+    fun beginListening() {
+        if (speechRecognizer == null) {
+            speechStatus = "Speech recognition is not available on this device."
+            return
+        }
+        speechStatus = "Listening..."
+        isListening = true
+        speechRecognizer.startListening(speechIntent)
+    }
+
+    val requestAudioPermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            beginListening()
+        } else {
+            speechStatus = "Microphone permission denied. You can still type manually."
+        }
+    }
+
+    DisposableEffect(speechRecognizer) {
+        if (speechRecognizer != null) {
+            speechRecognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    speechStatus = "Listening..."
+                }
+
+                override fun onBeginningOfSpeech() {
+                    speechStatus = "Capturing speech..."
+                }
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+                override fun onEndOfSpeech() {
+                    isListening = false
+                    speechStatus = "Processing transcription..."
+                }
+
+                override fun onError(error: Int) {
+                    isListening = false
+                    speechStatus = "Speech capture failed (code $error). Try again."
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val topMatch = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                    if (!topMatch.isNullOrBlank()) {
+                        draftText = topMatch
+                        hasSpeechInput = true
+                        speechStatus = "Transcription complete. You can edit before saving."
+                    } else {
+                        speechStatus = "No speech detected."
+                    }
+                    isListening = false
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val partial = partialResults
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                    if (!partial.isNullOrBlank()) {
+                        draftText = partial
+                    }
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            })
+        }
+
+        onDispose {
+            speechRecognizer?.destroy()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -42,14 +154,39 @@ fun RecordThoughtScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Type or paste your thought. Speech transcription will be connected next.",
+            text = speechStatus,
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        Button(
+            onClick = {
+                if (isListening) {
+                    speechRecognizer?.stopListening()
+                    isListening = false
+                    speechStatus = "Stopped listening."
+                } else {
+                    val isGranted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.RECORD_AUDIO,
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (isGranted) {
+                        beginListening()
+                    } else {
+                        requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+            }
+        ) {
+            Text(if (isListening) "Stop Listening" else "Start Listening")
+        }
 
         OutlinedTextField(
             value = draftText,
             onValueChange = { draftText = it },
-            modifier = Modifier.fillMaxSize().weight(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             label = { Text("Thought") },
         )
 
@@ -63,7 +200,7 @@ fun RecordThoughtScreen(
                             id = UUID.randomUUID().toString(),
                             timestampMillis = System.currentTimeMillis(),
                             text = draftText.trim(),
-                            source = ThoughtSource.MANUAL,
+                            source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
                         ),
                     )
                     onBack()

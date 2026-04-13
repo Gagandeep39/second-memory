@@ -12,6 +12,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
+/**
+ * File-based repository that persists thoughts into one JSON file per day.
+ */
 class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
     private val mutex = Mutex()
 
@@ -42,6 +45,9 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
         }
     }
 
+    /**
+     * Reads and parses a day file into domain models.
+     */
     private fun readDayThoughts(dayKey: String): List<Thought> {
         val file = dayFile(dayKey)
         if (!file.exists()) return emptyList()
@@ -71,6 +77,9 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
         return result
     }
 
+    /**
+     * Serializes the provided thoughts to JSON and writes to the day file.
+     */
     private fun writeDayThoughts(dayKey: String, thoughts: List<Thought>) {
         val root = JSONObject()
         val array = JSONArray()
@@ -88,6 +97,9 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
         dayFile(dayKey).writeText(root.toString(2))
     }
 
+    /**
+     * Returns the canonical file location for the given day key.
+     */
     private fun dayFile(dayKey: String): File {
         val dailyDir = File(context.filesDir, DAILY_DIR_NAME)
         if (!dailyDir.exists()) {
