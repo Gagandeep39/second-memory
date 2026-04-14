@@ -1,59 +1,55 @@
 ## Plan: Next Steps Only
 
-This file now tracks only remaining work. Completed phases (foundation, file storage, core screens, recording, and Gemini summary trigger) are intentionally removed.
+This file now tracks only remaining work. Completed phases are removed when finished. This keeps the plan focused on what’s left to do, without clutter from past steps.
 
-## Phase 4: Sync and Background
 
-1. Harden the Google Drive directory Sync for local `data/`.
-2. Sync scope must continue to include:
-   1. `data/raw`
-   2. `data/daily`
-   3. `data/weekly`
-   4. `data/monthly`
-3. Hardened bidirectional sync strategy:
-   1. Compare by relative path + modified time.
-   2. Upload local-only files to Drive.
-   3. Download remote-only files to local device.
-   4. Use last-write-wins for conflicting files (newer timestamp overwrites).
-   5. Never delete files from Drive based on local device state.
-4. Finish sync diagnostics and recovery UX in Settings:
-    1. Last sync time.
-    2. Last sync status/error.
-    3. File counts uploaded/downloaded.
-    4. Consent and re-auth recovery for Google Drive access.
-5. Added WorkManager jobs:
-    1.  Periodic background sync.
-    2.  Nightly daily-summary generation trigger.
-    3.  Added retry/backoff and network constraints for background jobs.
+## Phase I
 
-## Phase 5: Hardening and Release Readiness
+---
 
-1. Reliability and edge cases:
-1. Microphone unavailable/denied behavior.
-2. Gemini/network failure handling.
-3. Offline app behavior and user guidance.
-2. UX polish:
-1. Loading/empty/error states across screens.
-2. Better status surfaces for summarize/sync jobs.
-3. Performance for large daily files.
-3. Testing:
-1. Unit tests for repositories and formatting utilities.
-2. Instrumentation tests for record/edit/summarize/open flows.
-3. Background worker tests for scheduling/retry paths.
-4. Release prep:
-1. Crash-safe writes for JSON/markdown outputs.
-2. Privacy policy alignment for microphone + cloud LLM + sync.
-3. Observability/logging for sync and summary pipelines.
+## Phase I: Core UI/UX Improvements
 
-## Immediate Sprint (Recommended)
+1. RecordThought UI must be redesigned
+2. RecordThought listening must last longer before timing out
+3. Add a toast message when recording is saved
+4. Change settings icon
+5. Log screen clear log button must be icon at top right instead of a text button
+6. Back buttons must be on the top left of the screen instead of bottom (RecordThought screen is an exception)
+9. Record FAB must have an icon with text which should collapse when scrolling
+10. Daily view item must have a refresh icon instead of summary button and just a more elegant design
+18. Add proper icons
+19. Errors must be shown gracefully (In a snackbar instad of printing somewhere specific)
 
-1. Add background periodic sync worker and verify with emulator tests.
-2. Add retry/backoff and network constraints to sync and summary jobs.
-3. Tighten sync conflict handling and diagnostics after real-world testing.
+## Phase II: Enhanced Navigation & Views
 
-## Current Non-Goals
+8. Thought screen must have a better date change functionality. Left arrow, date, right arrow. Middle must show date and tapping it should open a calendar to select date. Left and right arrows should change the date by one day. Today's date must have a slightly different style to make it clear it's today. Also, add a "Today" button that appears when the date is not today, which takes you to today's date when tapped.
+11. Add a week view at the top of the daily view to jump to specific week. When we scroll, whatever week is currently in view should be highlighted in the week view. Tapping on a week in the week view should scroll to that week in the daily view.
+15. Add a screen for weekly summary
 
-1. Per-thought database indexing.
-2. Advanced merge UI.
-3. On-device LLM summarization.
-4. Home screen widget.
+## Phase III: Settings, Security & Customization
+
+7. Add an option to customize summary prompt in settings
+  1. Default prompt should also add a keyword sections
+  2. The points should be short and concise
+  3. Add a section for important keywords in the summary
+12. Redesign settings UI to have a Material 3 look and feel. Items must be categorized
+13. Gemini key must be in secured shared preference
+
+## Phase IV: Data, Export & Advanced Features
+
+14. Weekly files must use format YYYYWW.md
+16. Add option to download the markdown files
+17. Add link to google drive where data is stored
+19. Publish on google play store
+20. Add support for different LLM connections (including local models)
+
+---
+
+## Future Work
+
+- Search funtionality based on keywords
+  - Text based search across all summaries
+  - List will show date and a sentence containng that keyword with a highlight (Anything else that can be useful)
+  - Tapping on the item will take you to the thought screen of that day and scroll to the thought containing that keyword and highlight it
+- Add a chat view to ask questions about the data
+- 
