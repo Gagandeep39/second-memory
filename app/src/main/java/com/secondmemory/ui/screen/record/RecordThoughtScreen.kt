@@ -7,27 +7,25 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,21 +44,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import android.widget.Toast
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
 import kotlinx.coroutines.launch
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.UUID
-import androidx.compose.foundation.clickable
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
 
 /**
  * Screen used to capture a thought by typing or speech transcription and persist it for today.
@@ -79,6 +71,7 @@ fun RecordThoughtScreen(
     var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
     var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
     var showHint by remember { mutableStateOf(true) }
+    var isUserRequestedStop by remember { mutableStateOf(false) }
     // Hide hint after 3.5 seconds
     LaunchedEffect(Unit) {
         showHint = true
@@ -146,17 +139,35 @@ fun RecordThoughtScreen(
                 }
 
                 override fun onError(error: Int) {
-                    if (error == 7) {
-                        beginListening()
+                    rmsLevel = 0f
+
+                    // 1. If the user explicitly clicked stop, ignore the error and exit gracefully.
+                    if (isUserRequestedStop) {
+                        isListening = false
+                        speechStatus = "Stopped by user."
                         return
                     }
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Speech capture failed (code $error). Try again."
+
+                    // 2. If it's a silence timeout, restart the listener to keep it alive.
+                    if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_NO_MATCH) {
+                        beginListening()
+                    } else {
+                        // 3. Handle actual failures (network issues, permissions, etc.)
+                        isListening = false
+                        speechStatus = "Speech capture failed (code $error). Try again."
+                    }
                 }
 
                 override fun onResults(results: Bundle?) {
-                    beginListening()
+                    // Process final results here if needed
+
+                    // If the user hasn't clicked stop, keep the loop going
+                    if (!isUserRequestedStop) {
+                        beginListening()
+                    } else {
+                        isListening = false
+                        speechStatus = "Done."
+                    }
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -257,6 +268,7 @@ fun RecordThoughtScreen(
                                     if (isListening) {
                                         speechRecognizer?.stopListening()
                                         isListening = false
+                                        isUserRequestedStop = true
                                         rmsLevel = 0f
                                         speechStatus = "Stopped listening."
                                     } else {
