@@ -7,20 +7,11 @@ This file now tracks only remaining work. Completed phases are removed when fini
 
 ---
 
-## Phase I: Core UI/UX Improvements
+## Phase I
 
+18. Add proper icons
 1. RecordThought UI must be redesigned
 2. RecordThought listening must last longer before timing out
-3. Add a toast message when recording is saved
-4. Change settings icon
-5. Log screen clear log button must be icon at top right instead of a text button
-6. Back buttons must be on the top left of the screen instead of bottom (RecordThought screen is an exception)
-9. Record FAB must have an icon with text which should collapse when scrolling
-10. Daily view item must have a refresh icon instead of summary button and just a more elegant design
-18. Add proper icons
-
-## Phase I-B: Quality & Feedback
-
 19. Errors must be shown gracefully (In a snackbar instead of printing somewhere specific)
 20. Show build information, app version and related info in the settings screen
 
@@ -47,6 +38,7 @@ This file now tracks only remaining work. Completed phases are removed when fini
 17. Add link to google drive where data is stored
 19. Publish on google play store
 20. Add support for different LLM connections (including local models)
+21. Conflict files must be handled in a separate directory data/conflicts and system must add a log that there was a conflict instead of creating it in the same directory where conflict happened
 
 ---
 
