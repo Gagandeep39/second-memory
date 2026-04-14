@@ -299,15 +299,29 @@ private fun DailySummaryItem(
                 }
             },
             trailingContent = {
-                if (isBusy) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                } else {
-                    IconButton(onClick = onSummarize) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Re-summarize",
-                            tint = MaterialTheme.colorScheme.primary
+                val boxSize = 24.dp
+                val indicatorSize = 20.dp // Slightly smaller for visual match
+                Box(
+                    modifier = Modifier.size(boxSize),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(indicatorSize),
+                            strokeWidth = 2.dp
                         )
+                    } else {
+                        IconButton(
+                            onClick = onSummarize,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Re-summarize",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }

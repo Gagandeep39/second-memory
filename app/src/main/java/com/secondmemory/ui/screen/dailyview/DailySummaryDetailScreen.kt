@@ -69,9 +69,7 @@ fun DailySummaryDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(start = 24.dp, end = 24.dp, top = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(innerPadding),
         ) {
             if (content.isBlank()) {
                 Text(
@@ -86,6 +84,7 @@ fun DailySummaryDetailScreen(
                     markdown = content,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(24.dp)
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
                 )
