@@ -135,6 +135,10 @@ fun RecordThoughtScreen(
                 }
 
                 override fun onError(error: Int) {
+                    if (error == 7) {
+                        beginListening()
+                        return
+                    }
                     isListening = false
                     rmsLevel = 0f
                     speechStatus = "Speech capture failed (code $error). Try again."
