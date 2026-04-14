@@ -57,6 +57,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.UUID
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
 
 /**
  * Screen used to capture a thought by typing or speech transcription and persist it for today.
@@ -74,6 +78,13 @@ fun RecordThoughtScreen(
     var rmsLevel by remember { mutableStateOf(0f) }
     var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
     var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
+    var showHint by remember { mutableStateOf(true) }
+    // Hide hint after 3.5 seconds
+    LaunchedEffect(Unit) {
+        showHint = true
+        kotlinx.coroutines.delay(3500)
+        showHint = false
+    }
 
     val speechRecognizer = remember(context) {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -239,11 +250,33 @@ fun RecordThoughtScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                ) {
+                                    if (isListening) {
+                                        speechRecognizer?.stopListening()
+                                        isListening = false
+                                        rmsLevel = 0f
+                                        speechStatus = "Stopped listening."
+                                    } else {
+                                        val isGranted = ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.RECORD_AUDIO,
+                                        ) == PackageManager.PERMISSION_GRANTED
+
+                                        if (isGranted) {
+                                            beginListening()
+                                        } else {
+                                            requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                }
                         )
                     }
                 }
             }
-            // Bottom bar: Row of FABs (Back, Record, Save)
+            // Bottom bar: Row of FABs (Back, Save)
             androidx.compose.foundation.layout.Row(
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomCenter)
@@ -261,36 +294,6 @@ fun RecordThoughtScreen(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
                         modifier = Modifier.size(28.dp)
-                    )
-                }
-                // Record FAB (center, larger)
-                FloatingActionButton(
-                    onClick = {
-                        if (isListening) {
-                            speechRecognizer?.stopListening()
-                            isListening = false
-                            rmsLevel = 0f
-                            speechStatus = "Stopped listening."
-                        } else {
-                            val isGranted = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.RECORD_AUDIO,
-                            ) == PackageManager.PERMISSION_GRANTED
-
-                            if (isGranted) {
-                                beginListening()
-                            } else {
-                                requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        }
-                    },
-                    containerColor = if (isListening) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (isListening) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    Icon(
-                        imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                        contentDescription = if (isListening) "Stop Listening" else "Start Listening",
-                        modifier = Modifier.size(40.dp)
                     )
                 }
                 // Save FAB
@@ -322,6 +325,22 @@ fun RecordThoughtScreen(
                         modifier = Modifier.size(28.dp)
                     )
                 }
+            }
+
+            // Subtle hint at the bottom
+            AnimatedVisibility(
+                visible = showHint,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+            ) {
+                Text(
+                    text = "Tap the visualizer to toggle listening",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
             }
         }
     }
