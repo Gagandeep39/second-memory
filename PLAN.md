@@ -38,6 +38,7 @@ This file now tracks only remaining work. Completed phases are removed when fini
   3. Add a section for important keywords in the summary
 12. Redesign settings UI to have a Material 3 look and feel. Items must be categorized
 13. Gemini key must be in secured shared preference
+14. Add CICD automation for building and deploying the app
 
 ## Phase IV: Data, Export & Advanced Features
 
