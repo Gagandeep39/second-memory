@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
@@ -209,6 +210,7 @@ fun RecordThoughtScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+
             Column(
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -237,6 +239,70 @@ fun RecordThoughtScreen(
                         maxLines = 16,
                     )
                 }
+
+                // Elegant horizontal button row below the textbox
+                val canSave = draftTextFieldValue.text.isNotBlank()
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = onBack,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        androidx.compose.material3.Text(
+                            text = "Back",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            if (canSave) {
+                                scope.launch {
+                                    thoughtRepository.saveThought(
+                                        dayKey = todayDayKey(),
+                                        thought = Thought(
+                                            id = UUID.randomUUID().toString(),
+                                            timestampMillis = System.currentTimeMillis(),
+                                            text = draftTextFieldValue.text.trim(),
+                                            source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
+                                        ),
+                                    )
+                                    Toast.makeText(context, "Thought saved", Toast.LENGTH_SHORT).show()
+                                    onBack()
+                                }
+                            }
+                        },
+                        enabled = canSave,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (canSave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (canSave) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save Thought",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        androidx.compose.material3.Text(
+                            text = "Save",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+
                 // Bottom: Visualizer occupies lower half
                 Box(
                     modifier = Modifier
@@ -247,7 +313,7 @@ fun RecordThoughtScreen(
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = speechStatus,
@@ -286,56 +352,6 @@ fun RecordThoughtScreen(
                                 }
                         )
                     }
-                }
-            }
-            // Bottom bar: Row of FABs (Back, Save)
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp, start = 32.dp, end = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Back FAB
-                FloatingActionButton(
-                    onClick = onBack,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                // Save FAB
-                val canSave = draftTextFieldValue.text.isNotBlank()
-                FloatingActionButton(
-                    onClick = {
-                        if (canSave) {
-                            scope.launch {
-                                thoughtRepository.saveThought(
-                                    dayKey = todayDayKey(),
-                                    thought = Thought(
-                                        id = UUID.randomUUID().toString(),
-                                        timestampMillis = System.currentTimeMillis(),
-                                        text = draftTextFieldValue.text.trim(),
-                                        source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
-                                    ),
-                                )
-                                Toast.makeText(context, "Thought saved", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }
-                        }
-                    },
-                    containerColor = if (canSave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = if (canSave) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Save,
-                        contentDescription = "Save Thought",
-                        modifier = Modifier.size(28.dp)
-                    )
                 }
             }
 
