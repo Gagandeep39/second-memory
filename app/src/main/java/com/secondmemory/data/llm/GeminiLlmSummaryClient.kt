@@ -103,11 +103,14 @@ class GeminiLlmSummaryClient(
     private fun buildPrompt(dayKey: String, rawJson: String): String {
         return """
             Summarize the following day's raw thought JSON for date $dayKey.
-            Return valid markdown only.
+            Return valid markdown only. 
+            Don't actually include the hints. 
+            Must be between 10-200 lines.
+            Don't force add content to increase size and don't force remove things
             Include sections:
             - ## Summary of the day
-            - ## Action Items - Keep it in short points
-            - ## Keywords - Containing important keywords from the user content
+            - ## Things to do (hint: Tasks that need to be done later. Keep it in short points)
+            - ## Keywords (hint: Containing important keywords from the user content)
 
             Raw JSON:
             $rawJson
