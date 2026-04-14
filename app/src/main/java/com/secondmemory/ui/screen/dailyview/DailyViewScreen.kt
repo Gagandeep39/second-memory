@@ -48,6 +48,13 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.size
+
 /**
  * Screen that lists daily summary markdown files and can generate/open summaries.
  */
@@ -210,7 +217,7 @@ fun DailyViewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -222,6 +229,7 @@ fun DailyViewScreen(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -263,44 +271,45 @@ private fun DailySummaryItem(
     onOpen: () -> Unit,
     onSummarize: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(text = dayKeyDisplayText(item.dayKey), style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "Raw thoughts: ${item.thoughtCount}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = if (item.hasSummary) {
-                    "Summary: ready (${item.summaryWordCount} words)"
-                } else {
-                    "Summary: not generated yet"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (item.summaryLastUpdatedMillis != null) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onOpen
+    ) {
+        ListItem(
+            headlineContent = {
                 Text(
-                    text = "Last summarized: ${formatDateTime(item.summaryLastUpdatedMillis)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = dayKeyDisplayText(item.dayKey),
+                    style = MaterialTheme.typography.titleMedium
                 )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = !isBusy,
-                    onClick = onSummarize,
-                ) {
-                    Text(if (isBusy) "Summarizing..." else "Summarize")
+            },
+            supportingContent = {
+                Column {
+                    Text(
+                        text = "Thoughts: ${item.thoughtCount} • Words: ${item.summaryWordCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (item.summaryLastUpdatedMillis != null) {
+                        Text(
+                            text = "Last summarized: ${formatDateTime(item.summaryLastUpdatedMillis)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
-                if (item.hasSummary) {
-                    TextButton(onClick = onOpen) {
-                        Text("Open")
+            },
+            trailingContent = {
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    IconButton(onClick = onSummarize) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Re-summarize",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
-        }
+        )
     }
 }
 

@@ -88,7 +88,7 @@ fun SecondMemoryApp() {
                 item(
                     icon = {
                         Icon(
-                            painterResource(icon),
+                            imageVector = icon,
                             contentDescription = label,
                             modifier = Modifier.size(24.dp),
                         )

@@ -27,6 +27,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.derivedStateOf
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.util.dayKeyDisplayText
@@ -49,6 +55,12 @@ fun RawThoughtsScreen(
     var thoughts by remember { mutableStateOf(emptyList<Thought>()) }
     var editingThought by remember { mutableStateOf<Thought?>(null) }
     var editingText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val fabExpanded by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 10
+        }
+    }
 
     fun refreshThoughts() {
         scope.launch {
@@ -103,6 +115,7 @@ fun RawThoughtsScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -135,14 +148,15 @@ fun RawThoughtsScreen(
             }
         }
 
-        FloatingActionButton(
+        ExtendedFloatingActionButton(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(24.dp),
             onClick = onRecordThought,
-        ) {
-            Text("Record")
-        }
+            expanded = fabExpanded,
+            icon = { Icon(Icons.Default.Mic, contentDescription = null) },
+            text = { Text("Record") },
+        )
     }
 
     if (editingThought != null) {

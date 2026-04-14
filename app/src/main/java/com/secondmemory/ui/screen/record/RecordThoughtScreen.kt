@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
+import android.widget.Toast
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
@@ -236,6 +237,7 @@ fun RecordThoughtScreen(
                             source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
                         ),
                     )
+                    Toast.makeText(context, "Thought saved", Toast.LENGTH_SHORT).show()
                     onBack()
                 }
             }
