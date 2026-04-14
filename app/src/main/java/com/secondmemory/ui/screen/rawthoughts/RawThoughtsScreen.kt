@@ -1,5 +1,6 @@
 package com.secondmemory.ui.screen.rawthoughts
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.derivedStateOf
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.repository.ThoughtRepository
@@ -73,7 +75,22 @@ fun RawThoughtsScreen(
         refreshThoughts()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        floatingActionButton = {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(8.dp)
+            ) {
+                ExtendedFloatingActionButton(
+                    onClick = onRecordThought,
+                    expanded = fabExpanded,
+                    icon = { Icon(Icons.Default.Mic, contentDescription = null) },
+                    text = { Text("Record") },
+                )
+            }
+        },
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -147,16 +164,6 @@ fun RawThoughtsScreen(
                 }
             }
         }
-
-        ExtendedFloatingActionButton(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
-            onClick = onRecordThought,
-            expanded = fabExpanded,
-            icon = { Icon(Icons.Default.Mic, contentDescription = null) },
-            text = { Text("Record") },
-        )
     }
 
     if (editingThought != null) {

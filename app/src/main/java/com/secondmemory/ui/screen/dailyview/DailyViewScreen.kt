@@ -1,6 +1,7 @@
 package com.secondmemory.ui.screen.dailyview
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -182,7 +183,8 @@ fun DailyViewScreen(
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(8.dp)
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -195,7 +197,6 @@ fun DailyViewScreen(
                         contentDescription = "Pick summary date",
                     )
                 }
-
                 ExtendedFloatingActionButton(
                     onClick = {
                         scope.launch {
