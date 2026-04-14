@@ -82,7 +82,7 @@ fun RawThoughtsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Raw Thoughts",
+                text = "Thoughts",
                 style = MaterialTheme.typography.headlineMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
