@@ -18,7 +18,11 @@ This file now tracks only remaining work. Completed phases are removed when fini
 9. Record FAB must have an icon with text which should collapse when scrolling
 10. Daily view item must have a refresh icon instead of summary button and just a more elegant design
 18. Add proper icons
-19. Errors must be shown gracefully (In a snackbar instad of printing somewhere specific)
+
+## Phase I-B: Quality & Feedback
+
+19. Errors must be shown gracefully (In a snackbar instead of printing somewhere specific)
+20. Show build information, app version and related info in the settings screen
 
 ## Phase II: Enhanced Navigation & Views
 

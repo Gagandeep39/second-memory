@@ -8,6 +8,7 @@ These rules apply to any AI-assisted code changes in this repository.
 - Every non-trivial private helper should include a short KDoc comment describing purpose.
 - If logic has constraints or side effects, document assumptions directly above the code.
 - Keep documentation accurate when behavior changes or new functionality is added. Updating code without updating docs is not allowed.
+- Do not exceed documentation content beyond 200 lines in README.md. If documentation exceeds this, prioritize updating docs for the most critical and frequently modified areas of the code.
 
 ## Implementation Standards
 
