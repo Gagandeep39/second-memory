@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.secondmemory.domain.llm.LlmSummaryClient
+import com.secondmemory.domain.model.DailySummaryFile
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
@@ -78,6 +79,7 @@ import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatDateTime
 import com.secondmemory.util.todayDayKey
+import com.secondmemory.util.todayUtcStartOfDayMillis
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.Instant
@@ -321,160 +323,170 @@ fun DailyViewScreen(
             }
         },
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // Header Section
-            Box(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .height(48.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(
-                    text = "Daily",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.align(Alignment.CenterStart)
-                )
-
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isCurrentWeek,
-                    enter = fadeIn() + scaleIn(),
-                    exit = fadeOut() + scaleOut(),
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) {
-                    Surface(
-                        onClick = { selectedWeekStart = currentWeekStart },
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Today,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                "This Week",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Week Selector Bar
-            Surface(
-                tonalElevation = 2.dp,
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { selectedWeekStart = selectedWeekStart.minusWeeks(1) }
-                    ) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Week")
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { showViewDatePicker = true }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (isCurrentWeek) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatWeekRange(selectedWeekStart),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = if (isCurrentWeek) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isCurrentWeek) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { selectedWeekStart = selectedWeekStart.plusWeeks(1) }
-                    ) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Next Week")
-                    }
-                }
-            }
-
-            if (filteredItems.isNotEmpty()) {
-                Text(
-                    text = "${filteredItems.size} summaries",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-            }
-
-            if (filteredItems.isEmpty()) {
+                // Header Section
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .padding(top = 16.dp)
+                        .height(48.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Text(
+                        text = "Daily",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !isCurrentWeek,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     ) {
-                        Text(
-                            text = "No summaries for this week",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Tap the + icon or Summarize to generate one",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
+                        Surface(
+                            onClick = { selectedWeekStart = currentWeekStart },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Today,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "This Week",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+
+                // Week Selector Bar
+                Surface(
+                    tonalElevation = 2.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(filteredItems, key = { item -> item.dayKey }) { item ->
-                        DailySummaryItem(
-                            item = item,
-                            isBusy = activeSummarizeDay == item.dayKey,
-                            onOpen = { onOpenSummary(item.fileName) },
-                            onSummarize = {
-                                scope.launch {
-                                    summarizeDay(item.dayKey)
-                                }
-                            },
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { selectedWeekStart = selectedWeekStart.minusWeeks(1) }
+                        ) {
+                            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Week")
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { showViewDatePicker = true }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isCurrentWeek) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = formatWeekRange(selectedWeekStart),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = if (isCurrentWeek) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isCurrentWeek) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { selectedWeekStart = selectedWeekStart.plusWeeks(1) }
+                        ) {
+                            Icon(Icons.Default.ChevronRight, contentDescription = "Next Week")
+                        }
                     }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
+
+                if (filteredItems.isNotEmpty()) {
+                    Text(
+                        text = "${filteredItems.size} summaries",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+
+                if (filteredItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "No summaries for this week",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Tap the + icon or Summarize to generate one",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(filteredItems, key = { item -> item.dayKey }) { item ->
+                            DailySummaryItem(
+                                item = item,
+                                isBusy = activeSummarizeDay == item.dayKey,
+                                onOpen = { onOpenSummary(item.fileName) },
+                                onSummarize = {
+                                    scope.launch {
+                                        summarizeDay(item.dayKey)
+                                    }
+                                },
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                    }
+                }
+            }
+            // Overlay loading indicator
+            if (activeSummarizeDay != null) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                )
             }
         }
     }
