@@ -177,6 +177,7 @@ fun RecordThoughtScreen(
                         ?.firstOrNull()
                     if (!partial.isNullOrBlank()) {
                         draftTextFieldValue = appendTranscript(listeningBaseValue, partial)
+                        hasSpeechInput = true
                     }
                 }
 
@@ -219,7 +220,7 @@ fun RecordThoughtScreen(
                     text = "Record Thought",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 8.dp),
                 )
                 // Top: Text field occupies upper half
                 Box(
@@ -230,7 +231,12 @@ fun RecordThoughtScreen(
                 ) {
                     OutlinedTextField(
                         value = draftTextFieldValue,
-                        onValueChange = { draftTextFieldValue = it },
+                        onValueChange = {
+                            if (it.text != draftTextFieldValue.text) {
+                                hasSpeechInput = false
+                            }
+                            draftTextFieldValue = it
+                        },
                         modifier = Modifier
                             .fillMaxSize(),
                         label = { Text("What's on your mind?") },
