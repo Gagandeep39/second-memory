@@ -3,6 +3,7 @@ package com.secondmemory.util
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
@@ -24,6 +25,31 @@ fun todayDayKey(): String {
 fun shiftDayKey(dayKey: String, deltaDays: Long): String {
     val date = parseDayKey(dayKey) ?: LocalDate.now()
     return date.plusDays(deltaDays).format(dayKeyFormatter)
+}
+
+/**
+ * Returns today's date as a UTC midnight timestamp for the date picker.
+ */
+fun todayUtcStartOfDayMillis(): Long {
+    return LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+/**
+ * Converts a date picker timestamp into the app's yyyymmdd day key.
+ */
+fun dayKeyFromUtcMillis(timestampMillis: Long): String {
+    return Instant.ofEpochMilli(timestampMillis)
+        .atZone(ZoneOffset.UTC)
+        .toLocalDate()
+        .format(dayKeyFormatter)
+}
+
+/**
+ * Converts a day key into UTC midnight timestamp.
+ */
+fun dayKeyToUtcMillis(dayKey: String): Long {
+    val date = parseDayKey(dayKey) ?: LocalDate.now()
+    return date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 }
 
 /**
