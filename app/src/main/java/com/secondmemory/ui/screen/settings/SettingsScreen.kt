@@ -17,11 +17,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,7 +63,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -139,18 +141,13 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp, bottom = 8.dp)
+                    .padding(top = 20.dp)
             ) {
                 Text(
                     text = "Settings",
@@ -162,6 +159,7 @@ fun SettingsScreen(
             // --- Google Drive Sync Section ---
             SettingsSection(
                 title = "Sync & Backup",
+                description = "Manage Google Drive synchronization and daily auto backup",
                 icon = Icons.Outlined.Sync,
                 expanded = expandedSection == "sync",
                 onHeaderClick = {
@@ -183,7 +181,7 @@ fun SettingsScreen(
                     Button(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp),
                         onClick = {
                             scope.launch {
                                 driveStatusMessage = "Connecting Google account..."
@@ -369,11 +367,12 @@ fun SettingsScreen(
             // --- AI Features Section ---
             SettingsSection(
                 title = "AI Features",
+                description = "Configure API key to generate summaries by invoking LLM",
                 icon = Icons.Outlined.Cloud,
                 expanded = expandedSection == "ai",
                 onHeaderClick = {
                     expandedSection = if (expandedSection == "ai") null else "ai"
-                }
+                },
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -485,9 +484,9 @@ fun SettingsScreen(
                 }
             }
 
-            // --- Advanced Section ---
             SettingsSection(
                 title = "Advanced",
+                description = "View logs and diagnostic information",
                 icon = Icons.Outlined.History,
                 expanded = expandedSection == "advanced",
                 onHeaderClick = {
@@ -502,6 +501,7 @@ fun SettingsScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
             AppInfoSection()
         }
     }
@@ -551,6 +551,7 @@ private fun AppInfoSection() {
 @Composable
 private fun SettingsSection(
     title: String,
+    description: String? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     expanded: Boolean,
     onHeaderClick: () -> Unit,
@@ -558,7 +559,9 @@ private fun SettingsSection(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         ListItem(
-            modifier = Modifier.clickable(onClick = onHeaderClick),
+            modifier = Modifier
+                .clickable(onClick = onHeaderClick)
+                .height(IntrinsicSize.Min),
             headlineContent = {
                 Text(
                     text = title,
@@ -567,20 +570,39 @@ private fun SettingsSection(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             },
+            supportingContent = description?.let {
+                {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
             leadingContent = {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(
+                    modifier = Modifier.fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             },
             trailingContent = {
-                Icon(
-                    imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(
+                    modifier = Modifier.fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
