@@ -20,14 +20,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -102,215 +114,339 @@ fun SettingsScreen(
             .navigationBarsPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Text(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
 
-        Button(onClick = onOpenOperationLogs) {
-            Text("View Operation Logs")
-        }
+        // --- Google Drive Sync Section ---
+        SettingsSection(title = "Sync & Backup", icon = Icons.Default.Sync) {
+            if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        scope.launch {
+                            driveStatusMessage = "Connecting Google account..."
+                            val request = buildGoogleCredentialRequest(googleWebClientId)
+                            runCatching {
+                                val result = credentialManager.getCredential(
+                                    context = context,
+                                    request = request,
+                                )
+                                extractGoogleAccountEmail(result)
+                            }.onSuccess { email ->
+                                settingsRepository.setConnectedGoogleAccountEmail(email)
+                                driveStatusMessage = if (email.isNullOrBlank()) {
+                                    "Google connected, but account email was unavailable."
+                                } else {
+                                    "Google account connected."
+                                }
+                            }.onFailure { error ->
+                                driveStatusMessage = when (error) {
+                                    is GetCredentialCancellationException -> "Google sign-in was cancelled."
+                                    is NoCredentialException -> "No Google credential available on this device."
+                                    is GetCredentialException -> "Google sign-in failed: ${error.message}"
+                                    else -> "Google sign-in failed: ${error.message}"
+                                }
+                            }
+                        }
+                    },
+                ) {
+                    Text("Connect Google Account")
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Connected account",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = settings.connectedGoogleAccountEmail ?: "",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                                    }
+                                    settingsRepository.setConnectedGoogleAccountEmail(null)
+                                    settingsRepository.setDriveSyncEnabled(false)
+                                    driveStatusMessage = "Google account disconnected."
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Disconnect")
+                        }
+                    }
 
-        if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        driveStatusMessage = "Connecting Google account..."
-                        val request = buildGoogleCredentialRequest(googleWebClientId)
-                        runCatching {
-                            val result = credentialManager.getCredential(
-                                context = context,
-                                request = request,
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank() &&
+                                settings.syncState != SyncState.SYNCING,
+                        onClick = {
+                            scope.launch {
+                                runCatching {
+                                    settingsRepository.syncNow()
+                                }.onSuccess {
+                                    driveStatusMessage = "Drive sync finished."
+                                }.onFailure { error ->
+                                    val recoverableAuth = error as? UserRecoverableAuthException
+                                        ?: error.cause as? UserRecoverableAuthException
+                                    val recoverableIoAuth = error as? UserRecoverableAuthIOException
+                                        ?: error.cause as? UserRecoverableAuthIOException
+                                    if (recoverableAuth != null) {
+                                        recoverableAuth.intent?.let { consentLauncher.launch(it) }
+                                        driveStatusMessage = "Google authorization required."
+                                    } else if (recoverableIoAuth != null) {
+                                        consentLauncher.launch(recoverableIoAuth.intent)
+                                        driveStatusMessage = "Google authorization required."
+                                    } else {
+                                        driveStatusMessage = "Sync failed: ${error.message}"
+                                    }
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Sync Now")
+                    }
+
+                    Text(
+                        text = "Sync works bidirectionally: files are uploaded to and downloaded from Drive.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+
+                    // Sync Status Card
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Status",
+                                style = MaterialTheme.typography.titleSmall,
                             )
-                            extractGoogleAccountEmail(result)
-                        }.onSuccess { email ->
-                            settingsRepository.setConnectedGoogleAccountEmail(email)
-                            driveStatusMessage = if (email.isNullOrBlank()) {
-                                "Google connected, but account email was unavailable."
-                            } else {
-                                "Google account connected."
+                            Text(
+                                text = when (settings.syncState) {
+                                    SyncState.IDLE -> "Idle"
+                                    SyncState.SYNCING -> "Syncing now..."
+                                    SyncState.SUCCESS -> "Last sync succeeded"
+                                    SyncState.ERROR -> "Last sync failed"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            settings.lastSyncAtMillis?.let { timestamp ->
+                                Text(
+                                    text = "Last sync: ${formatDateTime(timestamp)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
-                        }.onFailure { error ->
-                            driveStatusMessage = when (error) {
-                                is GetCredentialCancellationException ->  "Google sign-in was cancelled."
-                                is NoCredentialException -> "No Google credential available on this device."
-                                is GetCredentialException -> "Google sign-in failed: ${error.message}"
-                                else ->  "Google sign-in failed: ${error.message}"
+                            settings.lastSyncMessage?.let { message ->
+                                Text(
+                                    text = message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (settings.syncState == SyncState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
-                },
-            ) {
-                Text("Connect Google Account")
-            }
-        } else {
-            Button(
-                onClick = {
-                    scope.launch {
-                        runCatching {
-                            credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                        }
-                        settingsRepository.setConnectedGoogleAccountEmail(null)
-                        settingsRepository.setDriveSyncEnabled(false)
-                        driveStatusMessage = "Google account disconnected."
-                    }
-                },
-            ) {
-                Text("Disconnect Google Account")
-            }
-        }
 
-        settings.connectedGoogleAccountEmail?.takeIf { it.isNotBlank() }?.let { email ->
-            Text(
-                text = "Connected account: $email",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-        SettingToggleRow(
-            title = "Enable Google Drive Sync",
-            description = "Enable synchronization of local daily files to Drive.",
-            checked = settings.driveSyncEnabled,
-            enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank(),
-            onCheckedChange = { enabled ->
-                scope.launch {
-                    settingsRepository.setDriveSyncEnabled(enabled)
+                    SettingToggleRow(
+                        title = "Daily Auto-Sync",
+                        description = "Automatically sync in the background once per day.",
+                        checked = settings.driveSyncEnabled,
+                        enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank(),
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsRepository.setDriveSyncEnabled(enabled)
+                            }
+                        },
+                    )
                 }
-            },
-        )
+            }
 
-        Text(
-            text = "Sync works bidirectionally: files are uploaded to Drive and downloaded from Drive. Files are never deleted from either location unless deleted on both devices.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-
-        driveStatusMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            driveStatusMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
 
-        Text(
-            text = "Sync Status",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = when (settings.syncState) {
-                SyncState.IDLE -> "Idle"
-                SyncState.SYNCING -> "Syncing now"
-                SyncState.SUCCESS -> "Last sync succeeded"
-                SyncState.ERROR -> "Last sync failed"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        settings.lastSyncAtMillis?.let { timestamp ->
-            Text(
-                text = "Last sync time: ${formatDateTime(timestamp)}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        settings.lastSyncMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+        // --- AI Features Section ---
+        SettingsSection(title = "AI Features", icon = Icons.Default.Cloud) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = geminiApiKeyDraft,
+                    onValueChange = { geminiApiKeyDraft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Gemini API Key") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    supportingText = {
+                        Text("Required for cloud summaries and AI insights.")
+                    }
+                )
 
-        Button(
-            enabled = settings.driveSyncEnabled &&
-                !settings.connectedGoogleAccountEmail.isNullOrBlank() &&
-                settings.syncState != SyncState.SYNCING,
-            onClick = {
-                scope.launch {
-                    runCatching {
-                        settingsRepository.syncNow()
-                    }.onSuccess {
-                        driveStatusMessage = "Drive sync finished."
-                    }.onFailure { error ->
-                        val recoverableAuth = error as? UserRecoverableAuthException
-                            ?: error.cause as? UserRecoverableAuthException
-                        val recoverableIoAuth = error as? UserRecoverableAuthIOException
-                            ?: error.cause as? UserRecoverableAuthIOException
-                        if (recoverableAuth != null) {
-                            recoverableAuth.intent?.let { consentLauncher.launch(it) }
-                            driveStatusMessage = "Google authorization required to continue sync."
-                        } else if (recoverableIoAuth != null) {
-                            consentLauncher.launch(recoverableIoAuth.intent)
-                            driveStatusMessage = "Google authorization required to continue sync."
-                        } else {
-                            driveStatusMessage = "Sync failed: ${error.message}"
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            scope.launch {
+                                settingsRepository.setGeminiApiKey(geminiApiKeyDraft)
+                                geminiStatusMessage = "Gemini key saved."
+                            }
+                        },
+                    ) {
+                        Text("Save Key")
+                    }
+
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        enabled = geminiApiKeyDraft.isNotBlank(),
+                        onClick = {
+                            scope.launch {
+                                geminiStatusMessage = "Testing Gemini key..."
+                                runCatching {
+                                    llmSummaryClient.testConnection(geminiApiKeyDraft)
+                                }.onSuccess {
+                                    geminiStatusMessage = "Gemini key is valid."
+                                }.onFailure { error ->
+                                    geminiStatusMessage = "Test failed: ${error.message}"
+                                }
+                            }
+                        },
+                    ) {
+                        Text("Test")
                     }
                 }
-            },
+
+                geminiStatusMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                HorizontalDivider()
+
+                SettingToggleRow(
+                    title = "Cloud Summaries",
+                    description = "Use Gemini to generate daily summaries of your thoughts.",
+                    checked = settings.cloudSummaryEnabled,
+                    enabled = settings.geminiApiKey.isNotBlank(),
+                    onCheckedChange = { enabled ->
+                        scope.launch {
+                            settingsRepository.setCloudSummaryEnabled(enabled)
+                        }
+                    },
+                )
+
+                if (settings.geminiApiKey.isBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = "Add API key to enable cloud summaries.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- Advanced Section ---
+        SettingsSection(title = "Advanced", icon = Icons.Default.History) {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenOperationLogs
+            ) {
+                Icon(Icons.Default.History, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("View Operation Logs")
+            }
+        }
+    }
+}
+
+/**
+ * A container for a group of related settings, styled with a title, icon, and a card background.
+ *
+ * @param title The display name of the section.
+ * @param icon The icon to show next to the title.
+ * @param content The composable content to be placed inside the section card.
+ */
+@Composable
+private fun SettingsSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    content: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
-            Text("Sync Now")
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.size(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
-
-        OutlinedTextField(
-            value = geminiApiKeyDraft,
-            onValueChange = { geminiApiKeyDraft = it },
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Gemini API Key") },
-            visualTransformation = PasswordVisualTransformation(),
-        )
-
-        Button(
-            onClick = {
-                scope.launch {
-                    settingsRepository.setGeminiApiKey(geminiApiKeyDraft)
-                    geminiStatusMessage = "Gemini key saved."
-                }
-            },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            shape = MaterialTheme.shapes.large
         ) {
-            Text("Save Gemini Key")
-        }
-
-        Button(
-            enabled = geminiApiKeyDraft.isNotBlank(),
-            onClick = {
-                scope.launch {
-                    geminiStatusMessage = "Testing Gemini key..."
-                    runCatching {
-                        llmSummaryClient.testConnection(geminiApiKeyDraft)
-                    }.onSuccess {
-                        geminiStatusMessage = "Gemini key is valid."
-                    }.onFailure { error ->
-                        geminiStatusMessage = "Gemini key test failed: ${error.message}"
-                    }
-                }
-            },
-        ) {
-            Text("Test Gemini Key")
-        }
-
-        geminiStatusMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        if (settings.geminiApiKey.isBlank()) {
-            Text(
-                text = "Add Gemini API key to enable cloud summaries.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        } else {
-            SettingToggleRow(
-                title = "Cloud Summaries",
-                description = "Allow daily summary generation using Gemini cloud model.",
-                checked = settings.cloudSummaryEnabled,
-                onCheckedChange = { enabled ->
-                    scope.launch {
-                        settingsRepository.setCloudSummaryEnabled(enabled)
-                    }
-                },
-            )
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                content()
+            }
         }
     }
 }
