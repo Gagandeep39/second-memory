@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SecondMemory</string>
+    <string name="app_name">Second Memory</string>
     <string name="google_web_client_id">468906434207-5fdn60t28h78icbn2acd7pqe16i5070g.apps.googleusercontent.com</string>
     <string name="shortcut_record_thought_short_label">Record Thought</string>
     <string name="shortcut_record_thought_long_label">Record a thought now</string>
