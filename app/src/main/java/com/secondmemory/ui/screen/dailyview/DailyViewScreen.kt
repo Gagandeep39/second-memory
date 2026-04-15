@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -289,8 +290,7 @@ fun DailyViewScreen(
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(8.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 FloatingActionButton(
                     onClick = {
