@@ -2,20 +2,12 @@
 
 This file now tracks only remaining work. Completed phases are removed when finished. This keeps the plan focused on what’s left to do, without clutter from past steps.
 
-
-## Phase I
-
----
-
-## Phase I
-
-8. Thought screen must have a better date change functionality. Left arrow, date, right arrow. Middle must show date and tapping it should open a calendar to select date. Left and right arrows should change the date by one day. Today's date must have a slightly different style to make it clear it's today. Also, add a "Today" button that appears when the date is not today, which takes you to today's date when tapped.
 1.  Errors must be shown gracefully (In a snackbar instead of printing somewhere specific)
 2.  Show build information, app version and related info in the settings screen
 
 ## Phase II: Enhanced Navigation & Views
 
-1.  Add a week view at the top of the daily view to jump to specific week. When we scroll, whatever week is currently in view should be highlighted in the week view. Tapping on a week in the week view should scroll to that week in the daily view.
+
 2.  Add a screen for weekly summary
 3. Add an option to customize summary prompt in settings
   1. Default prompt should also add a keyword sections
