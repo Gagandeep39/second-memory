@@ -1,6 +1,7 @@
 package com.secondmemory.ui.navigation
 
 import android.content.Intent
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -33,6 +34,7 @@ fun AppNavHost(
     settingsRepository: SettingsRepository,
     operationLogRepository: OperationLogRepository,
     llmSummaryClient: LlmSummaryClient,
+    snackbarHostState: SnackbarHostState,
 ) {
     val context = LocalContext.current
 
@@ -53,10 +55,12 @@ fun AppNavHost(
                 thoughtRepository = thoughtRepository,
                 dailySummaryRepository = dailySummaryRepository,
                 settingsRepository = settingsRepository,
+                operationLogRepository = operationLogRepository,
                 llmSummaryClient = llmSummaryClient,
                 onOpenSummary = { fileName ->
                     navController.navigate(AppDestination.DailySummaryDetail.routeForFile(fileName))
                 },
+                snackbarHostState = snackbarHostState
             )
         }
         composable(
@@ -78,7 +82,7 @@ fun AppNavHost(
                 llmSummaryClient = llmSummaryClient,
                 onOpenOperationLogs = {
                     navController.navigate(AppDestination.OperationLogs.route)
-                },
+                }
             )
         }
         composable(AppDestination.OperationLogs.route) {

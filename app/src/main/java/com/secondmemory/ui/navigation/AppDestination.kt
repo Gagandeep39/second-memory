@@ -1,30 +1,38 @@
 package com.secondmemory.ui.navigation
 
-import com.secondmemory.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 sealed class AppDestination(
     val route: String,
     val label: String,
-    val icon: Int,
+    val icon: ImageVector,
 ) {
     data object RawThoughts : AppDestination(
         route = "raw_thoughts",
-        label = "Raw Thoughts",
-        icon = R.drawable.ic_home,
+        label = "Thoughts",
+        icon = Icons.Default.Description,
     )
 
     data object DailyView : AppDestination(
         route = "daily_view",
-        label = "Daily View",
-        icon = R.drawable.ic_favorite,
+        label = "Daily",
+        icon = Icons.AutoMirrored.Default.EventNote,
     )
 
     data object Settings : AppDestination(
         route = "settings",
         label = "Settings",
-        icon = R.drawable.ic_account_box,
+        icon = Icons.Default.Settings,
     )
 
     /**
@@ -33,19 +41,19 @@ sealed class AppDestination(
     data object OperationLogs : AppDestination(
         route = "operation_logs",
         label = "Operation Logs",
-        icon = R.drawable.ic_favorite,
+        icon = Icons.Default.History,
     )
 
     data object RecordThought : AppDestination(
         route = "record_thought",
-        label = "Record Thought",
-        icon = R.drawable.ic_home,
+        label = "Capture",
+        icon = Icons.Default.GraphicEq,
     )
 
     data object DailySummaryDetail : AppDestination(
         route = "daily_summary_detail/{fileName}",
         label = "Daily Summary",
-        icon = R.drawable.ic_favorite,
+        icon = Icons.Default.Description,
     ) {
         /**
          * Creates a concrete route with encoded file name.

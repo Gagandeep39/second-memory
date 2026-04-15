@@ -7,8 +7,8 @@ These rules apply to any AI-assisted code changes in this repository.
 - Every new public class, interface, enum, object, and function must include KDoc that explains what it does.
 - Every non-trivial private helper should include a short KDoc comment describing purpose.
 - If logic has constraints or side effects, document assumptions directly above the code.
-- Keep documentation accurate when behavior changes. Updating code without updating docs is not allowed.
-- Any major code change must also update technical documentation in README when needed.
+- Keep documentation accurate when behavior changes or new functionality is added. Updating code without updating docs is not allowed.
+- Do not exceed documentation content beyond 200 lines in README.md. If documentation exceeds this, prioritize updating docs for the most critical and frequently modified areas of the code.
 
 ## Implementation Standards
 
@@ -16,6 +16,8 @@ These rules apply to any AI-assisted code changes in this repository.
 - Avoid hidden behavior in UI layers; move persistence and side effects to repository/domain layers.
 - Keep changes incremental and buildable at each step.
 - Preserve existing architecture unless a task explicitly requires refactoring.
+- Use existing patterns and utilities when possible; avoid introducing new abstractions without justification.
+- Screens must follow Material 3 design guidelines for consistency.
 
 ## Validation
 

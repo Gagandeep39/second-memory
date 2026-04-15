@@ -37,8 +37,7 @@ class GoogleDriveSyncClient(
      * Syncs local app files and remote Drive files bidirectionally for the connected Google account.
      * Downloads remote-only files, uploads local-only files, and resolves conflicts by timestamp.
      */
-    suspend fun syncLocalDataTree(accountEmail: String?): DriveSyncReport = withContext(Dispatchers.IO) {
-        val selectedEmail = accountEmail?.takeIf { it.isNotBlank() }
+    suspend fun syncLocalDataTree(accountEmail: String?): DriveSyncReport = withContext(Dispatchers.IO) {        val selectedEmail = accountEmail?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Connect a Google account before syncing.")
 
         val credential = GoogleAccountCredential.usingOAuth2(
@@ -195,12 +194,17 @@ class GoogleDriveSyncClient(
 
     /**
      * Downloads a remote file and writes it to local storage.
+     * Sets the local file's last modified time to match the remote file's modified time to avoid false conflicts.
      */
     private fun downloadRemoteFile(driveService: Drive, remoteId: String, localFile: java.io.File) {
         val output = java.io.ByteArrayOutputStream()
+        val remoteFile = driveService.files().get(remoteId).setFields("modifiedTime").execute()
         driveService.files().get(remoteId).executeMediaAndDownloadTo(output)
         localFile.parentFile?.mkdirs()
         localFile.writeBytes(output.toByteArray())
+        // Set last modified time to match remote
+        val remoteModified = remoteFile.modifiedTime?.value ?: System.currentTimeMillis()
+        localFile.setLastModified(remoteModified)
     }
 
     /**
@@ -265,6 +269,6 @@ class GoogleDriveSyncClient(
         const val ROOT_FOLDER_NAME = "com.secondmemory"
         const val DATA_FOLDER_NAME = "data"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-        const val TIME_SKEW_MILLIS = 2_000L
+        const val TIME_SKEW_MILLIS = 10_000L
     }
 }

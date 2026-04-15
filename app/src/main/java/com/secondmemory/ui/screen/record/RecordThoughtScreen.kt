@@ -7,16 +7,30 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -26,10 +40,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
@@ -37,8 +53,6 @@ import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
 import kotlinx.coroutines.launch
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.statusBarsPadding
 import java.util.UUID
 
 /**
@@ -57,6 +71,14 @@ fun RecordThoughtScreen(
     var rmsLevel by remember { mutableStateOf(0f) }
     var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
     var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
+    var showHint by remember { mutableStateOf(true) }
+    var isUserRequestedStop by remember { mutableStateOf(false) }
+    // Hide hint after 3.5 seconds
+    LaunchedEffect(Unit) {
+        showHint = true
+        kotlinx.coroutines.delay(3500)
+        showHint = false
+    }
 
     val speechRecognizer = remember(context) {
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -118,24 +140,35 @@ fun RecordThoughtScreen(
                 }
 
                 override fun onError(error: Int) {
-                    isListening = false
                     rmsLevel = 0f
-                    speechStatus = "Speech capture failed (code $error). Try again."
+
+                    // 1. If the user explicitly clicked stop, ignore the error and exit gracefully.
+                    if (isUserRequestedStop) {
+                        isListening = false
+                        speechStatus = "Stopped by user."
+                        return
+                    }
+
+                    // 2. If it's a silence timeout, restart the listener to keep it alive.
+                    if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_NO_MATCH) {
+                        beginListening()
+                    } else {
+                        // 3. Handle actual failures (network issues, permissions, etc.)
+                        isListening = false
+                        speechStatus = "Speech capture failed (code $error). Try again."
+                    }
                 }
 
                 override fun onResults(results: Bundle?) {
-                    val topMatch = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                    if (!topMatch.isNullOrBlank()) {
-                        draftTextFieldValue = appendTranscript(listeningBaseValue, topMatch)
-                        hasSpeechInput = true
-                        speechStatus = "Transcription complete. You can edit before saving."
+                    // Process final results here if needed
+
+                    // If the user hasn't clicked stop, keep the loop going
+                    if (!isUserRequestedStop) {
+                        beginListening()
                     } else {
-                        speechStatus = "No speech detected."
+                        isListening = false
+                        speechStatus = "Done."
                     }
-                    isListening = false
-                    rmsLevel = 0f
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -144,6 +177,7 @@ fun RecordThoughtScreen(
                         ?.firstOrNull()
                     if (!partial.isNullOrBlank()) {
                         draftTextFieldValue = appendTranscript(listeningBaseValue, partial)
+                        hasSpeechInput = true
                     }
                 }
 
@@ -169,82 +203,180 @@ fun RecordThoughtScreen(
         }
     }
 
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .navigationBarsPadding(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        Text(
-            text = "Record Thought",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = speechStatus,
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
 
-        AudioLevelVisualizer(
-            normalizedLevel = rmsLevel,
-            isListening = isListening,
-        )
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                // Title at the top
+                Text(
+                    text = "Record Thought",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 8.dp),
+                )
+                // Top: Text field occupies upper half
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = draftTextFieldValue,
+                        onValueChange = {
+                            if (it.text != draftTextFieldValue.text) {
+                                hasSpeechInput = false
+                            }
+                            draftTextFieldValue = it
+                        },
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        label = { Text("What's on your mind?") },
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        singleLine = false,
+                        maxLines = 16,
+                    )
+                }
 
-        Button(
-            onClick = {
-                if (isListening) {
-                    speechRecognizer?.stopListening()
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Stopped listening."
-                } else {
-                    val isGranted = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO,
-                    ) == PackageManager.PERMISSION_GRANTED
+                // Elegant horizontal button row below the textbox
+                val canSave = draftTextFieldValue.text.isNotBlank()
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = onBack,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        androidx.compose.material3.Text(
+                            text = "Back",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            if (canSave) {
+                                scope.launch {
+                                    thoughtRepository.saveThought(
+                                        dayKey = todayDayKey(),
+                                        thought = Thought(
+                                            id = UUID.randomUUID().toString(),
+                                            timestampMillis = System.currentTimeMillis(),
+                                            text = draftTextFieldValue.text.trim(),
+                                            source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
+                                        ),
+                                    )
+                                    Toast.makeText(context, "Thought saved", Toast.LENGTH_SHORT).show()
+                                    onBack()
+                                }
+                            }
+                        },
+                        enabled = canSave,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (canSave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (canSave) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save Thought",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        androidx.compose.material3.Text(
+                            text = "Save",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
 
-                    if (isGranted) {
-                        beginListening()
-                    } else {
-                        requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                // Bottom: Visualizer occupies lower half
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = speechStatus,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        AudioLevelVisualizer(
+                            normalizedLevel = rmsLevel,
+                            isListening = isListening,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                ) {
+                                    if (isListening) {
+                                        speechRecognizer?.stopListening()
+                                        isListening = false
+                                        isUserRequestedStop = true
+                                        rmsLevel = 0f
+                                        speechStatus = "Stopped listening."
+                                    } else {
+                                        val isGranted = ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.RECORD_AUDIO,
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                        isUserRequestedStop = false
+
+                                        if (isGranted) {
+                                            beginListening()
+                                        } else {
+                                            requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                }
+                        )
                     }
                 }
             }
-        ) {
-            Text(if (isListening) "Stop Listening" else "Start Listening")
-        }
 
-        OutlinedTextField(
-            value = draftTextFieldValue,
-            onValueChange = { draftTextFieldValue = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            label = { Text("Thought") },
-        )
-
-        Button(
-            enabled = draftTextFieldValue.text.isNotBlank(),
-            onClick = {
-                scope.launch {
-                    thoughtRepository.saveThought(
-                        dayKey = todayDayKey(),
-                        thought = Thought(
-                            id = UUID.randomUUID().toString(),
-                            timestampMillis = System.currentTimeMillis(),
-                            text = draftTextFieldValue.text.trim(),
-                            source = if (hasSpeechInput) ThoughtSource.SPEECH else ThoughtSource.MANUAL,
-                        ),
-                    )
-                    onBack()
-                }
+            // Subtle hint at the bottom
+            AnimatedVisibility(
+                visible = showHint,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+            ) {
+                Text(
+                    text = "Tap the visualizer to toggle listening",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
             }
-        ) {
-            Text("Save Thought")
-        }
-
-        Button(onClick = onBack) {
-            Text("Back")
         }
     }
 }

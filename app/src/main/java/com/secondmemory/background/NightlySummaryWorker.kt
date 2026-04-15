@@ -15,6 +15,8 @@ import com.secondmemory.util.ensureAppDataDirectories
 import com.secondmemory.util.shiftDayKey
 import com.secondmemory.util.todayDayKey
 
+import com.secondmemory.util.hasInternetConnection
+
 /**
  * Nightly worker that regenerates the previous day's summary when cloud summaries are enabled.
  *
@@ -45,6 +47,17 @@ class NightlySummaryWorker(
             source = "NightlySummaryWorker",
         )
         ensureAppDataDirectories(applicationContext)
+        // Pre-check for actual internet connectivity
+        if (!hasInternetConnection()) {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Nightly summary worker no internet",
+                status = "RETRY",
+                details = "No internet connectivity detected",
+                source = "NightlySummaryWorker",
+            )
+            return Result.retry()
+        }
         val settings = settingsRepository.currentSettings()
         if (!settings.cloudSummaryEnabled || settings.geminiApiKey.isBlank()) {
             operationLogRepository.appendLog(

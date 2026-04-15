@@ -10,6 +10,8 @@ import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.util.ensureAppDataDirectories
 
+import com.secondmemory.util.hasInternetConnection
+
 /**
  * Periodic worker that runs Google Drive sync when the feature is enabled.
  */
@@ -36,6 +38,17 @@ class DriveSyncWorker(
             source = "DriveSyncWorker",
         )
         ensureAppDataDirectories(applicationContext)
+        // Pre-check for actual internet connectivity
+        if (!hasInternetConnection()) {
+            operationLogRepository.appendLog(
+                category = "WORK",
+                action = "Drive worker no internet",
+                status = "RETRY",
+                details = "No internet connectivity detected",
+                source = "DriveSyncWorker",
+            )
+            return Result.retry()
+        }
         val settings = settingsRepository.currentSettings()
         if (!settings.driveSyncEnabled) {
             operationLogRepository.appendLog(
