@@ -501,7 +501,47 @@ fun SettingsScreen(
                     onClick = onOpenOperationLogs
                 )
             }
+
+            AppInfoSection()
         }
+    }
+}
+
+@Composable
+private fun AppInfoSection() {
+    val context = LocalContext.current
+    val packageInfo = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }.getOrNull()
+    }
+    val versionName = packageInfo?.versionName ?: "1.0"
+    val appName = R.string.app_name
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = stringResource(appName),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Version $versionName",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+        Text(
+            text = "$appName is your private digital garden.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
     }
 }
 
