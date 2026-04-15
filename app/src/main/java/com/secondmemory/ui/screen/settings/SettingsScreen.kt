@@ -147,7 +147,7 @@ fun SettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp)
+                    .padding(top = 20.dp, bottom = 16.dp)
             ) {
                 Text(
                     text = "Settings",
@@ -516,7 +516,7 @@ private fun AppInfoSection() {
         }.getOrNull()
     }
     val versionName = packageInfo?.versionName ?: "1.0"
-    val appName = R.string.app_name
+    val appName = stringResource(R.string.app_name)
 
     Column(
         modifier = Modifier
@@ -526,7 +526,7 @@ private fun AppInfoSection() {
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = stringResource(appName),
+            text = appName,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
