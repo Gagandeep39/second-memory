@@ -342,6 +342,7 @@ fun RecordThoughtScreen(
                                             context,
                                             Manifest.permission.RECORD_AUDIO,
                                         ) == PackageManager.PERMISSION_GRANTED
+                                        isUserRequestedStop = false
 
                                         if (isGranted) {
                                             beginListening()
