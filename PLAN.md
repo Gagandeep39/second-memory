@@ -2,10 +2,8 @@
 
 This file now tracks only remaining work. Completed phases are removed when finished. This keeps the plan focused on what’s left to do, without clutter from past steps.
 
-1.  Errors must be shown gracefully (In a snackbar instead of printing somewhere specific)
-2.  Show build information, app version and related info in the settings screen
 
-## Phase II: Enhanced Navigation & Views
+## Backlog
 
 
 2.  Add a screen for weekly summary
@@ -24,7 +22,6 @@ This file now tracks only remaining work. Completed phases are removed when fini
 12. Conflict files must be handled in a separate directory data/conflicts and system must add a log that there was a conflict instead of creating it in the same directory where conflict happened
 13. Add notification reminders to record thoughts at a specific time of the day - 9pm for example. This can be customizable in settings. Clicking opens record thought screen
 14. Add notification at morning 9 to show summary of yesterday's thoughts. This can also be customizable in settings. Clicking opens the specific markdown file
-15. Update widget 
 
 ---
 
