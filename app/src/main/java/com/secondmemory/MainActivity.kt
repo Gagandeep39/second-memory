@@ -125,7 +125,8 @@ fun SecondMemoryApp() {
                 }
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
+            Box ()
+            {
                 AppNavHost(
                     navController = navController,
                     thoughtRepository = thoughtRepository,

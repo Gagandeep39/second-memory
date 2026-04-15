@@ -74,9 +74,7 @@ fun OperationLogsScreen(
                             contentDescription = "Clear Logs"
                         )
                     }
-                },
-                // Keep this if you still need to prevent the double status bar spacing
-                windowInsets = WindowInsets(0.dp)
+                }
             )
         }
     ) { innerPadding ->

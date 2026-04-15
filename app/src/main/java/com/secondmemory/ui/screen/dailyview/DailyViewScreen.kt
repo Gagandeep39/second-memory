@@ -323,7 +323,8 @@ fun DailyViewScreen(
             }
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()
+            .padding(innerPadding)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
