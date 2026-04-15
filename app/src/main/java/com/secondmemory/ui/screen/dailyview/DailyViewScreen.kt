@@ -47,6 +47,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,8 +70,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
+import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
+import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatDateTime
 import com.secondmemory.util.todayDayKey
@@ -90,12 +94,13 @@ fun DailyViewScreen(
     thoughtRepository: ThoughtRepository,
     dailySummaryRepository: DailySummaryRepository,
     settingsRepository: SettingsRepository,
+    operationLogRepository: OperationLogRepository,
     llmSummaryClient: LlmSummaryClient,
+    snackbarHostState: SnackbarHostState,
     onOpenSummary: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var dayItems by remember { mutableStateOf(emptyList<DaySummaryItem>()) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
     var activeSummarizeDay by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showViewDatePicker by remember { mutableStateOf(false) }
@@ -148,22 +153,29 @@ fun DailyViewScreen(
     val summarizeDay: suspend (String) -> Unit = summarizeDay@{ dayKey ->
         val settings = settingsRepository.currentSettings()
         if (settings.geminiApiKey.isBlank()) {
-            statusMessage = "Add Gemini API key in Settings before summarizing."
+            snackbarHostState.showSnackbar("Add Gemini API key in Settings before summarizing.")
             return@summarizeDay
         }
         if (!settings.cloudSummaryEnabled) {
-            statusMessage = "Enable Cloud Summaries in Settings to summarize."
+            snackbarHostState.showSnackbar("Enable Cloud Summaries in Settings to summarize.")
             return@summarizeDay
         }
 
         val rawJson = thoughtRepository.readRawJson(dayKey)
         if (rawJson.isBlank()) {
-            statusMessage = "Raw JSON for $dayKey is empty or missing."
+            snackbarHostState.showSnackbar("Raw JSON for $dayKey is empty or missing.")
             return@summarizeDay
         }
 
         activeSummarizeDay = dayKey
-        statusMessage = "Summarizing $dayKey..."
+        
+        operationLogRepository.appendLog(
+            category = "SUMMARY",
+            action = "Generate summary",
+            status = "STARTED",
+            details = "dayKey=$dayKey",
+            source = "DailyViewScreen"
+        )
 
         runCatching {
             llmSummaryClient.summarizeDay(
@@ -175,13 +187,36 @@ fun DailyViewScreen(
             runCatching {
                 dailySummaryRepository.saveSummaryForDay(dayKey, markdown)
             }.onSuccess {
-                statusMessage = "Summary generated for $dayKey."
+                operationLogRepository.appendLog(
+                    category = "SUMMARY",
+                    action = "Generate summary",
+                    status = "SUCCESS",
+                    details = "dayKey=$dayKey",
+                    source = "DailyViewScreen"
+                )
+                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
                 refresh()
             }.onFailure { error ->
-                statusMessage = "Failed to save summary: ${error.message ?: "unknown error"}"
+                val errorMsg = error.message ?: "unknown error"
+                operationLogRepository.appendLog(
+                    category = "SUMMARY",
+                    action = "Generate summary",
+                    status = "ERROR",
+                    details = "Failed to save: $errorMsg",
+                    source = "DailyViewScreen"
+                )
+                snackbarHostState.showSnackbar("Failed to save summary: $errorMsg")
             }
         }.onFailure { error ->
-            statusMessage = "Summary failed: ${error.message ?: "unknown error"}"
+            val errorMsg = error.message ?: "unknown error"
+            operationLogRepository.appendLog(
+                category = "SUMMARY",
+                action = "Generate summary",
+                status = "ERROR",
+                details = errorMsg,
+                source = "DailyViewScreen"
+            )
+            snackbarHostState.showSnackbar("Summary failed: $errorMsg")
         }
 
         activeSummarizeDay = null
@@ -289,7 +324,6 @@ fun DailyViewScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -393,15 +427,6 @@ fun DailyViewScreen(
                 Text(
                     text = "${filteredItems.size} summaries",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-            }
-
-            statusMessage?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
