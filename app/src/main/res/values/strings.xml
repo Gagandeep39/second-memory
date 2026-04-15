@@ -3,8 +3,8 @@
     <string name="google_web_client_id">468906434207-5fdn60t28h78icbn2acd7pqe16i5070g.apps.googleusercontent.com</string>
     <string name="shortcut_record_thought_short_label">Record Thought</string>
     <string name="shortcut_record_thought_long_label">Record a thought now</string>
-    <string name="widget_record_thought_name">Quick Record Thought</string>
-    <string name="widget_record_thought_title">Capture Thought</string>
-    <string name="widget_record_thought_subtitle">Tap to open recorder instantly</string>
-    <string name="widget_record_thought_description">One-tap widget to open Record Thought</string>
+    <string name="widget_record_thought_name">Quick Capture</string>
+    <string name="widget_record_thought_title">Capture a Memory</string>
+    <string name="widget_record_thought_subtitle">Tap to capture instantly</string>
+    <string name="widget_record_thought_description">One-tap widget to capture a memory</string>
 </resources>

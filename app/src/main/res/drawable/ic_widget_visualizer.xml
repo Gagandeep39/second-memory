@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- Outer Ring 1 (Dim) -->
+    <path
+        android:fillAlpha="0.15"
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,16m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
+    <!-- Outer Ring 2 -->
+    <path
+        android:fillAlpha="0.3"
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,16m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0" />
+    <!-- Inner Circle (Solid) -->
+    <path
+        android:fillAlpha="0.6"
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,16m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <!-- Center Point -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,16m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>

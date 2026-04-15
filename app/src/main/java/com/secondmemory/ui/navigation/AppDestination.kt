@@ -1,10 +1,11 @@
 package com.secondmemory.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,7 +26,7 @@ sealed class AppDestination(
     data object DailyView : AppDestination(
         route = "daily_view",
         label = "Daily",
-        icon = Icons.Default.EventNote,
+        icon = Icons.AutoMirrored.Default.EventNote,
     )
 
     data object Settings : AppDestination(
@@ -45,8 +46,8 @@ sealed class AppDestination(
 
     data object RecordThought : AppDestination(
         route = "record_thought",
-        label = "Record Thought",
-        icon = Icons.Default.Mic,
+        label = "Capture",
+        icon = Icons.Default.GraphicEq,
     )
 
     data object DailySummaryDetail : AppDestination(
