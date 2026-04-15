@@ -179,11 +179,6 @@ fun SettingsScreen(
                         leadingContent = { Icon(Icons.Outlined.Cloud, null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
                     Button(
                         modifier = Modifier
                             .fillMaxWidth()
