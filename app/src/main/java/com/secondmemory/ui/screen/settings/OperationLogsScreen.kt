@@ -3,6 +3,7 @@ package com.secondmemory.ui.screen.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,8 +13,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material3.BottomAppBarDefaults.windowInsets
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DividerDefaults
@@ -48,47 +51,40 @@ fun OperationLogsScreen(
     val scope = rememberCoroutineScope()
     val logs by operationLogRepository.observeLogs().collectAsState(initial = emptyList())
 
-    Scaffold { innerPadding ->
+    Scaffold (
+        topBar = {
+            TopAppBar(title = {
+                Text("Operation Logs")
+            },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    // The spacer is no longer needed; 'actions' automatically aligns to the right
+                    IconButton(
+                        onClick = { scope.launch { operationLogRepository.clearLogs() } }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = "Clear Logs"
+                        )
+                    }
+                },
+                // Keep this if you still need to prevent the double status bar spacing
+                windowInsets = WindowInsets(0.dp)
+            )
+        }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            // Header (fixed)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp, top = 4.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.padding(0.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Text(
-                    text = "Operation Logs",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                // Clear logs button (right aligned)
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = { scope.launch { operationLogRepository.clearLogs() } },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteSweep,
-                        contentDescription = "Clear Logs"
-                    )
-                }
-            }
-            HorizontalDivider(
-                Modifier,
-                DividerDefaults.Thickness,
-                DividerDefaults.color
-            )
             // Content
             Column(
                 modifier = Modifier

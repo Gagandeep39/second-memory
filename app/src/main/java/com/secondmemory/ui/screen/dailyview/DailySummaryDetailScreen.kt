@@ -3,6 +3,7 @@ package com.secondmemory.ui.screen.dailyview
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -12,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -54,32 +56,28 @@ fun DailySummaryDetailScreen(
         }
     }
 
-    Scaffold { innerPadding ->
+    Scaffold (
+        topBar = {
+            TopAppBar(title = {
+                Text(fileName)
+            },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                // Keep this if you still need to prevent the double status bar spacing
+                windowInsets = WindowInsets(0.dp)
+            )
+        }
+    ) { innerPadding ->
         Column(modifier = Modifier
             .fillMaxSize()
+            .padding(innerPadding)
         ) {
-            // Header (fixed)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp, top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.padding(0.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Text(
-                    text = fileName,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
             // Content (scrollable)
             if (content.isBlank()) {
                 Text(
