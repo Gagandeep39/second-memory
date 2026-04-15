@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -164,8 +165,8 @@ fun RawThoughtsScreen(
             ExtendedFloatingActionButton(
                 onClick = onRecordThought,
                 expanded = fabExpanded,
-                icon = { Icon(Icons.Default.Mic, contentDescription = null) },
-                text = { Text("Record") },
+                icon = { Icon(painterResource(id = com.secondmemory.R.drawable.ic_widget_visualizer), contentDescription = "Capture a memory") },
+                text = { Text("Capture") },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
