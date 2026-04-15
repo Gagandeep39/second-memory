@@ -486,7 +486,7 @@ fun DailyViewScreen(
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
+                        .align(Alignment.BottomCenter)
                 )
             }
         }
