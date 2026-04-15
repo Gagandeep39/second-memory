@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -61,9 +63,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.util.dayKeyDisplayText
@@ -89,6 +94,7 @@ fun RawThoughtsScreen(
     var editingThought by remember { mutableStateOf<Thought?>(null) }
     var editingText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var thoughtToDelete by remember { mutableStateOf<Thought?>(null) }
 
     val listState = rememberLazyListState()
     val fabExpanded by remember {
@@ -99,15 +105,32 @@ fun RawThoughtsScreen(
 
     val isToday = selectedDayKey == todayDayKey()
 
-    fun refreshThoughts() {
+    fun refreshThoughts(scrollToTop: Boolean = false) {
         scope.launch {
             thoughts = thoughtRepository.listForDay(selectedDayKey)
                 .sortedByDescending { it.timestampMillis }
+            if (scrollToTop && thoughts.isNotEmpty()) {
+                listState.scrollToItem(0)
+            }
         }
     }
 
     LaunchedEffect(selectedDayKey) {
-        refreshThoughts()
+        refreshThoughts(scrollToTop = true)
+    }
+
+    // Refresh thoughts whenever the screen comes back to the foreground (e.g., returning from Recording activity)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshThoughts(scrollToTop = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     if (showDatePicker) {
@@ -251,6 +274,15 @@ fun RawThoughtsScreen(
                 }
             }
 
+            if (thoughts.isNotEmpty()) {
+                Text(
+                    text = "${thoughts.size} entries",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             if (thoughts.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -280,14 +312,6 @@ fun RawThoughtsScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item {
-                        Text(
-                            text = "${thoughts.size} entries",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-                        )
-                    }
                     items(items = thoughts, key = { it.id }) { thought ->
                         ThoughtItem(
                             thought = thought,
@@ -296,10 +320,7 @@ fun RawThoughtsScreen(
                                 editingText = thought.text
                             },
                             onDelete = {
-                                scope.launch {
-                                    thoughtRepository.deleteThought(selectedDayKey, thought.id)
-                                    refreshThoughts()
-                                }
+                                thoughtToDelete = thought
                             },
                         )
                     }
@@ -354,12 +375,41 @@ fun RawThoughtsScreen(
             },
         )
     }
+
+    if (thoughtToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { thoughtToDelete = null },
+            title = { Text("Delete Thought") },
+            text = { Text("Are you sure you want to permanently delete this thought?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val thought = thoughtToDelete ?: return@TextButton
+                        scope.launch {
+                            thoughtRepository.deleteThought(selectedDayKey, thought.id)
+                            thoughtToDelete = null
+                            refreshThoughts()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { thoughtToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 /**
  * Individual thought entry card.
- * Features a decorative top accent, hero text content, and an integrated footer 
- * that balances metadata (time/source) with grouped action buttons.
+ * Features a clean "Content + Toolbar" design. The thought text occupies the top area,
+ * while a subtle footer bar anchors metadata (time/source) and action buttons
+ * together, eliminating awkward empty spaces.
  */
 @Composable
 private fun ThoughtItem(
@@ -370,84 +420,92 @@ private fun ThoughtItem(
     val isSpeech = thought.source.name == "SPEECH"
     
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Middle Section: The Thought Content
+        Column {
+            // Main Content Area
             Text(
                 text = thought.text,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    lineHeight = 24.sp
+                    lineHeight = 24.sp,
+                    letterSpacing = 0.25.sp
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
             )
 
-            // Bottom Section: Integrated Metadata (Left) and Actions (Right)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Integrated Footer Toolbar
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Metadata Group: Fills the bottom-left space
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = formatTime(thought.timestampMillis),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Surface(
-                        color = (if (isSpeech) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary)
-                            .copy(alpha = 0.1f),
-                        shape = CircleShape
+                    // Left: Metadata Group
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = if (isSpeech) "VOICE" else "TYPED",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            text = formatTime(thought.timestampMillis),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        
+                        Box(
+                            modifier = Modifier
+                                .size(3.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+
+                        Text(
+                            text = if (isSpeech) "Voice" else "Typed",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = if (isSpeech) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                            letterSpacing = 0.5.sp
+                            modifier = Modifier.clip(CircleShape)
                         )
                     }
-                }
 
-                // Action Group: Grouped in a subtle "Action Dock"
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                    // Right: Actions Group
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 Icons.Default.EditNote,
                                 contentDescription = "Edit",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Box(
-                            modifier = Modifier
-                                .size(1.dp, 16.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
-                        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 Icons.Default.DeleteOutline,
                                 contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
