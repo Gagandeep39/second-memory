@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -15,7 +16,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,81 +48,108 @@ fun OperationLogsScreen(
     val scope = rememberCoroutineScope()
     val logs by operationLogRepository.observeLogs().collectAsState(initial = emptyList())
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Operation Logs") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { scope.launch { operationLogRepository.clearLogs() } }) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear Logs"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (logs.isEmpty()) {
-                Text(
-                    text = "No operations recorded yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+            // Header (fixed)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp, top = 4.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.padding(0.dp)
                 ) {
-                    items(logs, key = { entry -> entry.id }) { entry ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Text(
-                                    text = "${entry.category} • ${entry.status}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                                Text(
-                                    text = entry.action,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Text(
-                                    text = formatDateTime(entry.timestampMillis),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                entry.details?.let { details ->
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+                Text(
+                    text = "Operation Logs",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                // Clear logs button (right aligned)
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { scope.launch { operationLogRepository.clearLogs() } },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteSweep,
+                        contentDescription = "Clear Logs"
+                    )
+                }
+            }
+            HorizontalDivider(
+                Modifier,
+                DividerDefaults.Thickness,
+                DividerDefaults.color
+            )
+            // Content
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (logs.isEmpty()) {
+                    Text(
+                        text = "No operations recorded yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        // Top spacing
+                        item {
+                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        items(logs, key = { entry -> entry.id }) { entry ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
                                     Text(
-                                        text = details,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "${entry.category} • ${entry.status}",
+                                        style = MaterialTheme.typography.titleSmall,
                                     )
-                                }
-                                entry.source?.let { source ->
                                     Text(
-                                        text = "source: $source",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        text = entry.action,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        text = formatDateTime(entry.timestampMillis),
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    entry.details?.let { details ->
+                                        Text(
+                                            text = details,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                    entry.source?.let { source ->
+                                        Text(
+                                            text = "source: $source",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
+                        }
+                        // Bottom spacing
+                        item {
+                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
