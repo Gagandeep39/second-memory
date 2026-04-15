@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.History
@@ -58,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -117,6 +121,7 @@ fun SettingsScreen(
     val credentialManager = CredentialManager.create(context)
     var geminiStatusMessage by remember { mutableStateOf<String?>(null) }
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
+    var expandedSection by remember { mutableStateOf<String?>(null) }
     val consentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -138,18 +143,31 @@ fun SettingsScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, bottom = 8.dp)
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
 
             // --- Google Drive Sync Section ---
-            SettingsSection(title = "Sync & Backup", icon = Icons.Outlined.Sync) {
+            SettingsSection(
+                title = "Sync & Backup",
+                icon = Icons.Outlined.Sync,
+                expanded = expandedSection == "sync",
+                onHeaderClick = {
+                    expandedSection = if (expandedSection == "sync") null else "sync"
+                }
+            ) {
                 if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
                     ListItem(
                         headlineContent = { Text("Cloud Backup") },
@@ -316,6 +334,7 @@ fun SettingsScreen(
                     SettingToggleItem(
                         title = "Daily Auto-Sync",
                         description = "Automatically backup in the background",
+                        icon = Icons.Outlined.Sync,
                         checked = settings.driveSyncEnabled,
                         enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank(),
                         onCheckedChange = { enabled ->
@@ -348,7 +367,14 @@ fun SettingsScreen(
             }
 
             // --- AI Features Section ---
-            SettingsSection(title = "AI Features", icon = Icons.Outlined.Cloud) {
+            SettingsSection(
+                title = "AI Features",
+                icon = Icons.Outlined.Cloud,
+                expanded = expandedSection == "ai",
+                onHeaderClick = {
+                    expandedSection = if (expandedSection == "ai") null else "ai"
+                }
+            ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -422,6 +448,7 @@ fun SettingsScreen(
                 SettingToggleItem(
                     title = "Cloud Summaries",
                     description = "Generate daily summaries using AI",
+                    icon = Icons.Outlined.Cloud,
                     checked = settings.cloudSummaryEnabled,
                     enabled = settings.geminiApiKey.isNotBlank(),
                     onCheckedChange = { enabled ->
@@ -459,7 +486,14 @@ fun SettingsScreen(
             }
 
             // --- Advanced Section ---
-            SettingsSection(title = "Advanced", icon = Icons.Outlined.History) {
+            SettingsSection(
+                title = "Advanced",
+                icon = Icons.Outlined.History,
+                expanded = expandedSection == "advanced",
+                onHeaderClick = {
+                    expandedSection = if (expandedSection == "advanced") null else "advanced"
+                }
+            ) {
                 SettingClickableItem(
                     title = "Operation Logs",
                     description = "View detailed synchronization and AI logs",
@@ -472,45 +506,62 @@ fun SettingsScreen(
 }
 
 /**
- * A container for a group of related settings, styled with a title, icon, and a card background.
+ * An expandable container for a group of related settings, styled as an accordion.
  */
 @Composable
 private fun SettingsSection(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    expanded: Boolean,
+    onHeaderClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.size(12.dp))
-            Text(
-                text = title.uppercase(),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            ),
-            shape = MaterialTheme.shapes.extraLarge
+        ListItem(
+            modifier = Modifier.clickable(onClick = onHeaderClick),
+            headlineContent = {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            leadingContent = {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
             Column(
-                modifier = Modifier.padding(vertical = 4.dp),
-                content = content
-            )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                content()
+            }
         }
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     }
 }
 
@@ -521,6 +572,7 @@ private fun SettingsSection(
 private fun SettingToggleItem(
     title: String,
     description: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     checked: Boolean,
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
@@ -528,6 +580,7 @@ private fun SettingToggleItem(
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = description?.let { { Text(it) } },
+        leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         trailingContent = {
             Switch(
                 checked = checked,
