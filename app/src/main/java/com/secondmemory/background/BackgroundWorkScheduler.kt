@@ -47,15 +47,15 @@ object BackgroundWorkScheduler {
                 workManager.cancelUniqueWork(DriveSyncWork.UNIQUE_NAME)
             }
 
-            // Nightly summary job
+            // Daily summary job
             if (settings.cloudSummaryEnabled) {
                 workManager.enqueueUniquePeriodicWork(
-                    NightlySummaryWork.UNIQUE_NAME,
+                    DailySummaryWork.UNIQUE_NAME,
                     ExistingPeriodicWorkPolicy.UPDATE,
-                    createNightlySummaryRequest(),
+                    createDailySummaryRequest(),
                 )
             } else {
-                workManager.cancelUniqueWork(NightlySummaryWork.UNIQUE_NAME)
+                workManager.cancelUniqueWork(DailySummaryWork.UNIQUE_NAME)
             }
 
             operationLogRepository.appendLog(
@@ -86,11 +86,11 @@ object BackgroundWorkScheduler {
     /**
      * Creates the nightly request that generates previous-day summaries.
      */
-    private fun createNightlySummaryRequest() = PeriodicWorkRequestBuilder<NightlySummaryWorker>(
-        NightlySummaryWork.REPEAT_HOURS,
+    private fun createDailySummaryRequest() = PeriodicWorkRequestBuilder<DailySummaryWorker>(
+        DailySummaryWork.REPEAT_HOURS,
         TimeUnit.HOURS,
     )
-        .setInitialDelay(nextNightlyDelayMillis(), TimeUnit.MILLISECONDS)
+        .setInitialDelay(nextDailyDelayMillis(), TimeUnit.MILLISECONDS)
         .setConstraints(networkConstraint())
         .setBackoffCriteria(
             BackoffPolicy.EXPONENTIAL,
@@ -111,7 +111,7 @@ object BackgroundWorkScheduler {
     /**
      * Computes delay until the next local nightly trigger time.
      */
-    private fun nextNightlyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+    private fun nextDailyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
         val nextTrigger = now.withHour(1).withMinute(15).withSecond(0).withNano(0)
         val target = if (nextTrigger.isAfter(now)) nextTrigger else nextTrigger.plusDays(1)
         return Duration.between(now, target).toMillis().coerceAtLeast(0L)
@@ -128,7 +128,7 @@ object BackgroundWorkScheduler {
     /**
      * Constants that belong specifically to nightly summary scheduling.
      */
-    private object NightlySummaryWork {
+    private object DailySummaryWork {
         const val UNIQUE_NAME = "nightly_daily_summary"
         const val REPEAT_HOURS = 24L
     }

@@ -131,7 +131,7 @@ Work scheduling:
 
 Workers:
 1. Drive sync worker: [app/src/main/java/com/secondmemory/background/DriveSyncWorker.kt](app/src/main/java/com/secondmemory/background/DriveSyncWorker.kt)
-2. Nightly summary worker: [app/src/main/java/com/secondmemory/background/NightlySummaryWorker.kt](app/src/main/java/com/secondmemory/background/NightlySummaryWorker.kt)
+2. Daily summary worker: [app/src/main/java/com/secondmemory/background/DailySummaryWorker.kt](app/src/main/java/com/secondmemory/background/DailySummaryWorker.kt)
 3. Retry classifier: [app/src/main/java/com/secondmemory/background/WorkRetryPolicy.kt](app/src/main/java/com/secondmemory/background/WorkRetryPolicy.kt)
 
 Registration point:
@@ -142,7 +142,7 @@ Job definitions:
    - Unique name: `periodic_drive_sync`
    - Repeat interval: every 6 hours
    - Runs only when Drive sync is enabled in Settings
-2. Nightly Daily Summary
+2. Daily Summary
    - Unique name: `nightly_daily_summary`
    - Repeat interval: every 24 hours
    - Initial alignment: next local 01:15

@@ -18,11 +18,11 @@ import com.secondmemory.util.todayDayKey
 import com.secondmemory.util.hasInternetConnection
 
 /**
- * Nightly worker that regenerates the previous day's summary when cloud summaries are enabled.
+ * Daily worker that regenerates the previous day's summary.
  *
  * Example: if this runs at 01:15 on April 14, it targets April 13.
  */
-class NightlySummaryWorker(
+class DailySummaryWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
@@ -41,44 +41,33 @@ class NightlySummaryWorker(
     override suspend fun doWork(): Result {
         operationLogRepository.appendLog(
             category = "WORK",
-            action = "Nightly summary worker started",
+            action = "Daily summary worker started",
             status = "STARTED",
             details = "runAttempt=${runAttemptCount + 1}",
-            source = "NightlySummaryWorker",
+            source = "DailySummaryWorker",
         )
         ensureAppDataDirectories(applicationContext)
         // Pre-check for actual internet connectivity
         if (!hasInternetConnection()) {
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Nightly summary worker no internet",
+                action = "Daily summary worker no internet",
                 status = "RETRY",
                 details = "No internet connectivity detected",
-                source = "NightlySummaryWorker",
+                source = "DailySummaryWorker",
             )
             return Result.retry()
         }
         val settings = settingsRepository.currentSettings()
-        if (!settings.cloudSummaryEnabled || settings.geminiApiKey.isBlank()) {
-            operationLogRepository.appendLog(
-                category = "WORK",
-                action = "Nightly summary worker skipped",
-                status = "SKIPPED",
-                details = "Cloud summaries disabled or Gemini key missing",
-                source = "NightlySummaryWorker",
-            )
-            return Result.success()
-        }
-
         val targetDayKey = previousDayKey()
         val rawJson = thoughtRepository.readRawJson(targetDayKey)
         if (rawJson.isBlank()) {
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Nightly summary worker skipped",
+                action = "Daily summary worker skipped",
                 status = "SKIPPED",
                 details = "No raw thoughts for $targetDayKey",
-                source = "NightlySummaryWorker",
+                source = "DailySummaryWorker",
             )
             return Result.success()
         }
@@ -92,19 +81,19 @@ class NightlySummaryWorker(
             dailySummaryRepository.saveSummaryForDay(targetDayKey, markdown)
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Nightly summary generated",
+                action = "Daily summary generated",
                 status = "SUCCESS",
                 details = targetDayKey,
-                source = "NightlySummaryWorker",
+                source = "DailySummaryWorker",
             )
             Result.success()
         }.getOrElse { error ->
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Nightly summary worker failed",
+                action = "Daily summary worker failed",
                 status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
-                details = error.message ?: "Nightly summary generation failed",
-                source = "NightlySummaryWorker",
+                details = error.message ?: "Daily summary generation failed",
+                source = "DailySummaryWorker",
             )
             if (shouldRetryWork(error)) {
                 Result.retry()
@@ -126,7 +115,7 @@ class NightlySummaryWorker(
      */
     private fun errorData(error: Throwable): Data {
         return Data.Builder()
-            .putString("error", error.message ?: "Nightly summary generation failed")
+            .putString("error", error.message ?: "Daily summary generation failed")
             .build()
     }
 }
