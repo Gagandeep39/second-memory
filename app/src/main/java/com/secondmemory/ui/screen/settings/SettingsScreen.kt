@@ -94,6 +94,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.secondmemory.R
+import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.background.DriveSyncWorker
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.domain.llm.LlmSummaryClient
@@ -323,7 +324,6 @@ fun SettingsScreen(
                                             )
                                             .build()
                                         workManager.enqueue(request)
-                                        driveStatusMessage = "Sync started in background."
                                     }
                                 ) {
                                     Icon(Icons.Outlined.Sync, contentDescription = "Sync Now")
@@ -348,6 +348,9 @@ fun SettingsScreen(
                         onCheckedChange = { enabled ->
                             scope.launch {
                                 settingsRepository.setDriveSyncEnabled(enabled)
+                                if (enabled) {
+                                    BackgroundWorkScheduler.scheduleRecurringWork(context);
+                                }
                             }
                         },
                     )
@@ -463,6 +466,9 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         scope.launch {
                             settingsRepository.setCloudSummaryEnabled(enabled)
+                            if (enabled) {
+                                BackgroundWorkScheduler.scheduleRecurringWork(context);
+                            }
                         }
                     },
                 )
