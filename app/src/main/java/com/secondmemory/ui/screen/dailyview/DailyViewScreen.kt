@@ -198,8 +198,9 @@ fun DailyViewScreen(
                     details = "dayKey=$dayKey",
                     source = "DailyViewScreen"
                 )
-                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
+                activeSummarizeDay = null
                 refresh()
+                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
             }.onFailure { error ->
                 val errorMsg = error.message ?: "unknown error"
                 operationLogRepository.appendLog(
@@ -209,6 +210,7 @@ fun DailyViewScreen(
                     details = "Failed to save: $errorMsg",
                     source = "DailyViewScreen"
                 )
+                activeSummarizeDay = null
                 snackbarHostState.showSnackbar("Failed to save summary: $errorMsg")
             }
         }.onFailure { error ->
@@ -220,10 +222,9 @@ fun DailyViewScreen(
                 details = errorMsg,
                 source = "DailyViewScreen"
             )
+            activeSummarizeDay = null
             snackbarHostState.showSnackbar("Summary failed: $errorMsg")
         }
-
-        activeSummarizeDay = null
     }
 
     LaunchedEffect(Unit) {
