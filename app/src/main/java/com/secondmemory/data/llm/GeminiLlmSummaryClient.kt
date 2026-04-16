@@ -100,17 +100,40 @@ class GeminiLlmSummaryClient(
     /**
      * Builds a markdown-focused instruction prompt for daily summarization.
      */
+
+    var prompt = """
+        You are generating a structured daily journal summary from raw thought logs. 
+
+        Input: JSON containing timestamped thoughts captured throughout a single day. 
+
+        Instructions: 
+        - Return valid markdown only. 
+        - Be concise but meaningful. Target ~150–300 words total. 
+        - Remove noise, repetition, and low-value thoughts. 
+        - Infer intent where needed, but do not hallucinate new events. 
+        - Merge similar thoughts into a single idea. 
+        - Preserve chronological flow where helpful. 
+
+        Output format: 
+
+        ## Summary of the day 
+        Write a clear, narrative-style summary of the day as a cohesive story. Focus on key activities, themes, and mindset. 
+
+        ## Achievements 
+        List concrete things completed or meaningful progress made. 
+        - Use bullet points 
+        - Only include items with clear completion or progress 
+
+        ## Things to do 
+        List actionable follow-ups or pending tasks inferred from the thoughts. 
+        - Keep each item short and specific 
+        - No more than 10 items
+    """.trimIndent()
+
     private fun buildPrompt(dayKey: String, rawJson: String): String {
         return """
-            Summarize the following day's raw thought JSON for date $dayKey.
-            Return valid markdown only. 
-            Don't actually include the hints. 
-            Must be between 10-200 lines.
-            Don't force add content to increase size and don't force remove things
-            Include sections:
-            - ## Summary of the day
-            - ## Things to do (hint: Tasks that need to be done later. Keep it in short points)
-            - ## Keywords (hint: Containing important keywords from the user content)
+            $prompt
+            Day Key: $dayKey
 
             Raw JSON:
             $rawJson
