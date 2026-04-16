@@ -47,9 +47,4 @@ interface SettingsRepository {
      * Returns the current sync metadata snapshot.
      */
     suspend fun currentSyncMetadata(): SyncMetadata
-
-    /**
-     * Starts a manual sync operation.
-     */
-    suspend fun syncNow()
 }

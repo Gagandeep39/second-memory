@@ -110,21 +110,6 @@ class DataStoreSettingsRepository(
         return syncRepository.currentSyncMetadata()
     }
 
-    override suspend fun syncNow() {
-        val settings = currentSettings()
-        operationLogRepository.appendLog(
-            category = "SYNC",
-            action = "Manual sync triggered",
-            status = "STARTED",
-            details = settings.connectedGoogleAccountEmail ?: "No connected account",
-            source = "DataStoreSettingsRepository",
-        )
-        syncRepository.syncNow(
-            driveSyncEnabled = settings.driveSyncEnabled,
-            accountEmail = settings.connectedGoogleAccountEmail,
-        )
-    }
-
     /**
      * Maps datastore preferences to strongly typed app settings.
      */

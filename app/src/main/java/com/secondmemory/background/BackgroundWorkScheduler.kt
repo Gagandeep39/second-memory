@@ -20,27 +20,49 @@ import java.util.concurrent.TimeUnit
  */
 object BackgroundWorkScheduler {
     /**
-     * Enqueues or updates all recurring background jobs with network and retry constraints.
+     * Enqueues or cancels recurring background jobs based on current settings.
      */
     fun scheduleRecurringWork(context: Context) {
         val operationLogRepository = DataStoreOperationLogRepository(context)
         val workManager = WorkManager.getInstance(context)
-        workManager.enqueueUniquePeriodicWork(
-            DriveSyncWork.UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            createDriveSyncRequest(),
-        )
-        workManager.enqueueUniquePeriodicWork(
-            NightlySummaryWork.UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            createNightlySummaryRequest(),
-        )
         CoroutineScope(Dispatchers.IO).launch {
+            // Read current settings
+            val settingsRepository = com.secondmemory.data.repository.DataStoreSettingsRepository(
+                context = context,
+                syncRepository = com.secondmemory.data.repository.DataStoreSyncRepository(
+                    context = context,
+                    driveSyncClient = com.secondmemory.data.drive.GoogleDriveSyncClient(context),
+                ),
+            )
+            val settings = settingsRepository.currentSettings()
+
+            // Drive sync job
+            if (settings.driveSyncEnabled) {
+                workManager.enqueueUniquePeriodicWork(
+                    DriveSyncWork.UNIQUE_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    createDriveSyncRequest(),
+                )
+            } else {
+                workManager.cancelUniqueWork(DriveSyncWork.UNIQUE_NAME)
+            }
+
+            // Daily summary job
+            if (settings.cloudSummaryEnabled) {
+                workManager.enqueueUniquePeriodicWork(
+                    DailySummaryWork.UNIQUE_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    createDailySummaryRequest(),
+                )
+            } else {
+                workManager.cancelUniqueWork(DailySummaryWork.UNIQUE_NAME)
+            }
+
             operationLogRepository.appendLog(
                 category = "WORK",
                 action = "Recurring work scheduled",
                 status = "SUCCESS",
-                details = "drive=${DriveSyncWork.UNIQUE_NAME}, nightly=${NightlySummaryWork.UNIQUE_NAME}",
+                details = "drive=${settings.driveSyncEnabled}, dailySummary=${settings.cloudSummaryEnabled}",
                 source = "BackgroundWorkScheduler",
             )
         }
@@ -64,11 +86,11 @@ object BackgroundWorkScheduler {
     /**
      * Creates the nightly request that generates previous-day summaries.
      */
-    private fun createNightlySummaryRequest() = PeriodicWorkRequestBuilder<NightlySummaryWorker>(
-        NightlySummaryWork.REPEAT_HOURS,
+    private fun createDailySummaryRequest() = PeriodicWorkRequestBuilder<DailySummaryWorker>(
+        DailySummaryWork.REPEAT_HOURS,
         TimeUnit.HOURS,
     )
-        .setInitialDelay(nextNightlyDelayMillis(), TimeUnit.MILLISECONDS)
+        .setInitialDelay(nextDailyDelayMillis(), TimeUnit.MILLISECONDS)
         .setConstraints(networkConstraint())
         .setBackoffCriteria(
             BackoffPolicy.EXPONENTIAL,
@@ -89,7 +111,7 @@ object BackgroundWorkScheduler {
     /**
      * Computes delay until the next local nightly trigger time.
      */
-    private fun nextNightlyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+    private fun nextDailyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
         val nextTrigger = now.withHour(1).withMinute(15).withSecond(0).withNano(0)
         val target = if (nextTrigger.isAfter(now)) nextTrigger else nextTrigger.plusDays(1)
         return Duration.between(now, target).toMillis().coerceAtLeast(0L)
@@ -106,7 +128,7 @@ object BackgroundWorkScheduler {
     /**
      * Constants that belong specifically to nightly summary scheduling.
      */
-    private object NightlySummaryWork {
+    private object DailySummaryWork {
         const val UNIQUE_NAME = "nightly_daily_summary"
         const val REPEAT_HOURS = 24L
     }

@@ -54,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -197,8 +198,9 @@ fun DailyViewScreen(
                     details = "dayKey=$dayKey",
                     source = "DailyViewScreen"
                 )
-                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
+                activeSummarizeDay = null
                 refresh()
+                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
             }.onFailure { error ->
                 val errorMsg = error.message ?: "unknown error"
                 operationLogRepository.appendLog(
@@ -208,6 +210,7 @@ fun DailyViewScreen(
                     details = "Failed to save: $errorMsg",
                     source = "DailyViewScreen"
                 )
+                activeSummarizeDay = null
                 snackbarHostState.showSnackbar("Failed to save summary: $errorMsg")
             }
         }.onFailure { error ->
@@ -219,10 +222,9 @@ fun DailyViewScreen(
                 details = errorMsg,
                 source = "DailyViewScreen"
             )
+            activeSummarizeDay = null
             snackbarHostState.showSnackbar("Summary failed: $errorMsg")
         }
-
-        activeSummarizeDay = null
     }
 
     LaunchedEffect(Unit) {
@@ -289,6 +291,52 @@ fun DailyViewScreen(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                title = {
+                    Text(
+                        text = "Daily",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                },
+                actions = {
+                    AnimatedVisibility(
+                        visible = !isCurrentWeek,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                    ) {
+                        Surface(
+                            onClick = { selectedWeekStart = currentWeekStart },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Today,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "This Week",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -331,52 +379,6 @@ fun DailyViewScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Header Section
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                        .height(48.dp)
-                ) {
-                    Text(
-                        text = "Daily",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.align(Alignment.CenterStart)
-                    )
-
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = !isCurrentWeek,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut(),
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    ) {
-                        Surface(
-                            onClick = { selectedWeekStart = currentWeekStart },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Today,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    "This Week",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-
                 // Week Selector Bar
                 Surface(
                     tonalElevation = 2.dp,
@@ -486,7 +488,7 @@ fun DailyViewScreen(
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
+                        .align(Alignment.BottomCenter)
                 )
             }
         }

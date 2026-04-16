@@ -50,16 +50,6 @@ class DriveSyncWorker(
             return Result.retry()
         }
         val settings = settingsRepository.currentSettings()
-        if (!settings.driveSyncEnabled) {
-            operationLogRepository.appendLog(
-                category = "WORK",
-                action = "Drive worker skipped",
-                status = "SKIPPED",
-                details = "Drive sync is disabled in settings",
-                source = "DriveSyncWorker",
-            )
-            return Result.success()
-        }
 
         return runCatching {
             syncRepository.syncNow(

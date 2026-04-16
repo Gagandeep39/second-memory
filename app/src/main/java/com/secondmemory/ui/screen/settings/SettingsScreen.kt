@@ -66,6 +66,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -83,17 +84,26 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.secondmemory.R
+import com.secondmemory.background.BackgroundWorkScheduler
+import com.secondmemory.background.DriveSyncWorker
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.util.formatDateTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -127,7 +137,7 @@ fun SettingsScreen(
     val credentialManager = CredentialManager.create(context)
     var geminiStatusMessage by remember { mutableStateOf<String?>(null) }
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
-    var expandedSection by remember { mutableStateOf<String?>(null) }
+    var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
     val consentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -141,13 +151,23 @@ fun SettingsScreen(
     Scaffold (
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                title = {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                },
             )
         }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(innerPadding),
         ) {
@@ -157,22 +177,20 @@ fun SettingsScreen(
                 title = "Sync & Backup",
                 description = "Manage Google Drive synchronization and daily auto backup",
                 icon = Icons.Outlined.Sync,
-                expanded = expandedSection == "sync",
+                expanded = expandedSections.contains("sync"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "sync") null else "sync"
+                    expandedSections = if (expandedSections.contains("sync")) {
+                        expandedSections - "sync"
+                    } else {
+                        expandedSections + "sync"
+                    }
                 }
             ) {
                 if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
                     ListItem(
                         headlineContent = { Text("Cloud Backup") },
                         supportingContent = { Text("Connect your Google account to sync your thoughts across devices.") },
-                        leadingContent = { Icon(Icons.Outlined.Cloud, null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
                     )
                     Button(
                         modifier = Modifier
@@ -270,16 +288,6 @@ fun SettingsScreen(
                                 }
                             }
                         },
-                        leadingContent = {
-                            Icon(
-                                imageVector = when (settings.syncState) {
-                                    SyncState.ERROR -> Icons.Outlined.Info
-                                    else -> Icons.Outlined.Sync
-                                },
-                                contentDescription = null,
-                                tint = if (settings.syncState == SyncState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            )
-                        },
                         trailingContent = {
                             if (settings.syncState == SyncState.SYNCING) {
                                 CircularProgressIndicator(
@@ -289,27 +297,27 @@ fun SettingsScreen(
                             } else {
                                 IconButton(
                                     onClick = {
-                                        scope.launch {
-                                            runCatching {
-                                                settingsRepository.syncNow()
-                                            }.onSuccess {
-                                                driveStatusMessage = "Drive sync finished."
-                                            }.onFailure { error ->
-                                                val recoverableAuth = error as? UserRecoverableAuthException
-                                                    ?: error.cause as? UserRecoverableAuthException
-                                                val recoverableIoAuth = error as? UserRecoverableAuthIOException
-                                                    ?: error.cause as? UserRecoverableAuthIOException
-                                                if (recoverableAuth != null) {
-                                                    recoverableAuth.intent?.let { consentLauncher.launch(it) }
-                                                    driveStatusMessage = "Google authorization required."
-                                                } else if (recoverableIoAuth != null) {
-                                                    consentLauncher.launch(recoverableIoAuth.intent)
-                                                    driveStatusMessage = "Google authorization required."
-                                                } else {
-                                                    driveStatusMessage = "Sync failed: ${error.message}"
-                                                }
-                                            }
+                                        // Enqueue a one-time sync job in the background using DriveSyncWorker
+                                        val workManager = WorkManager.getInstance(context)
+                                        // Log manual sync trigger
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            DataStoreOperationLogRepository(context)
+                                                .appendLog(
+                                                    category = "WORK",
+                                                    action = "Manual sync triggered from settings",
+                                                    status = "STARTED",
+                                                    details = "User pressed Sync Now button",
+                                                    source = "SettingsScreen"
+                                            )
                                         }
+                                        val request = OneTimeWorkRequestBuilder<DriveSyncWorker>()
+                                            .setConstraints(
+                                                Constraints.Builder()
+                                                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                    .build()
+                                            )
+                                            .build()
+                                        workManager.enqueue(request)
                                     }
                                 ) {
                                     Icon(Icons.Outlined.Sync, contentDescription = "Sync Now")
@@ -328,12 +336,14 @@ fun SettingsScreen(
                     SettingToggleItem(
                         title = "Daily Auto-Sync",
                         description = "Automatically backup in the background",
-                        icon = Icons.Outlined.Sync,
                         checked = settings.driveSyncEnabled,
                         enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank(),
                         onCheckedChange = { enabled ->
                             scope.launch {
                                 settingsRepository.setDriveSyncEnabled(enabled)
+                                if (enabled) {
+                                    BackgroundWorkScheduler.scheduleRecurringWork(context);
+                                }
                             }
                         },
                     )
@@ -365,9 +375,13 @@ fun SettingsScreen(
                 title = "AI Features",
                 description = "Configure API key to generate summaries by invoking LLM",
                 icon = Icons.Outlined.Cloud,
-                expanded = expandedSection == "ai",
+                expanded = expandedSections.contains("ai"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "ai") null else "ai"
+                    expandedSections = if (expandedSections.contains("ai")) {
+                        expandedSections - "ai"
+                    } else {
+                        expandedSections + "ai"
+                    }
                 },
             ) {
                 Column(
@@ -443,56 +457,36 @@ fun SettingsScreen(
                 SettingToggleItem(
                     title = "Cloud Summaries",
                     description = "Generate daily summaries using AI",
-                    icon = Icons.Outlined.Cloud,
                     checked = settings.cloudSummaryEnabled,
                     enabled = settings.geminiApiKey.isNotBlank(),
                     onCheckedChange = { enabled ->
                         scope.launch {
                             settingsRepository.setCloudSummaryEnabled(enabled)
+                            if (enabled) {
+                                BackgroundWorkScheduler.scheduleRecurringWork(context);
+                            }
                         }
                     },
                 )
-
-                if (settings.geminiApiKey.isBlank()) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = "Add API key to enable cloud summaries.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Outlined.Info,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
-                }
             }
 
             SettingsSection(
                 title = "Advanced",
                 description = "View logs and diagnostic information",
                 icon = Icons.Outlined.History,
-                expanded = expandedSection == "advanced",
+                expanded = expandedSections.contains("advanced"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "advanced") null else "advanced"
+                    expandedSections = if (expandedSections.contains("advanced")) {
+                        expandedSections - "advanced"
+                    } else {
+                        expandedSections + "advanced"
+                    }
                 }
             ) {
                 SettingClickableItem(
                     title = "Operation Logs",
                     description = "View detailed synchronization and AI logs",
-                    icon = Icons.Outlined.History,
+                    // Removed redundant icon
                     onClick = onOpenOperationLogs
                 )
             }
@@ -511,7 +505,7 @@ private fun AppInfoSection() {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }.getOrNull()
     }
-    val versionName = packageInfo?.versionName ?: "1.0"
+    val versionName = packageInfo?.versionName ?: "0.0"
     val appName = stringResource(R.string.app_name)
 
     Column(
