@@ -20,27 +20,49 @@ import java.util.concurrent.TimeUnit
  */
 object BackgroundWorkScheduler {
     /**
-     * Enqueues or updates all recurring background jobs with network and retry constraints.
+     * Enqueues or cancels recurring background jobs based on current settings.
      */
     fun scheduleRecurringWork(context: Context) {
         val operationLogRepository = DataStoreOperationLogRepository(context)
         val workManager = WorkManager.getInstance(context)
-        workManager.enqueueUniquePeriodicWork(
-            DriveSyncWork.UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            createDriveSyncRequest(),
-        )
-        workManager.enqueueUniquePeriodicWork(
-            NightlySummaryWork.UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            createNightlySummaryRequest(),
-        )
         CoroutineScope(Dispatchers.IO).launch {
+            // Read current settings
+            val settingsRepository = com.secondmemory.data.repository.DataStoreSettingsRepository(
+                context = context,
+                syncRepository = com.secondmemory.data.repository.DataStoreSyncRepository(
+                    context = context,
+                    driveSyncClient = com.secondmemory.data.drive.GoogleDriveSyncClient(context),
+                ),
+            )
+            val settings = settingsRepository.currentSettings()
+
+            // Drive sync job
+            if (settings.driveSyncEnabled) {
+                workManager.enqueueUniquePeriodicWork(
+                    DriveSyncWork.UNIQUE_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    createDriveSyncRequest(),
+                )
+            } else {
+                workManager.cancelUniqueWork(DriveSyncWork.UNIQUE_NAME)
+            }
+
+            // Nightly summary job
+            if (settings.cloudSummaryEnabled) {
+                workManager.enqueueUniquePeriodicWork(
+                    NightlySummaryWork.UNIQUE_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    createNightlySummaryRequest(),
+                )
+            } else {
+                workManager.cancelUniqueWork(NightlySummaryWork.UNIQUE_NAME)
+            }
+
             operationLogRepository.appendLog(
                 category = "WORK",
                 action = "Recurring work scheduled",
                 status = "SUCCESS",
-                details = "drive=${DriveSyncWork.UNIQUE_NAME}, nightly=${NightlySummaryWork.UNIQUE_NAME}",
+                details = "drive=${settings.driveSyncEnabled}, dailySummary=${settings.cloudSummaryEnabled}",
                 source = "BackgroundWorkScheduler",
             )
         }
