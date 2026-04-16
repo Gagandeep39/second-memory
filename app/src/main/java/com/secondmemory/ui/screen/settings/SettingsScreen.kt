@@ -137,7 +137,7 @@ fun SettingsScreen(
     val credentialManager = CredentialManager.create(context)
     var geminiStatusMessage by remember { mutableStateOf<String?>(null) }
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
-    var expandedSection by remember { mutableStateOf<String?>(null) }
+    var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
     val consentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -167,6 +167,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(innerPadding),
         ) {
@@ -176,9 +177,13 @@ fun SettingsScreen(
                 title = "Sync & Backup",
                 description = "Manage Google Drive synchronization and daily auto backup",
                 icon = Icons.Outlined.Sync,
-                expanded = expandedSection == "sync",
+                expanded = expandedSections.contains("sync"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "sync") null else "sync"
+                    expandedSections = if (expandedSections.contains("sync")) {
+                        expandedSections - "sync"
+                    } else {
+                        expandedSections + "sync"
+                    }
                 }
             ) {
                 if (settings.connectedGoogleAccountEmail.isNullOrBlank()) {
@@ -382,9 +387,13 @@ fun SettingsScreen(
                 title = "AI Features",
                 description = "Configure API key to generate summaries by invoking LLM",
                 icon = Icons.Outlined.Cloud,
-                expanded = expandedSection == "ai",
+                expanded = expandedSections.contains("ai"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "ai") null else "ai"
+                    expandedSections = if (expandedSections.contains("ai")) {
+                        expandedSections - "ai"
+                    } else {
+                        expandedSections + "ai"
+                    }
                 },
             ) {
                 Column(
@@ -504,9 +513,13 @@ fun SettingsScreen(
                 title = "Advanced",
                 description = "View logs and diagnostic information",
                 icon = Icons.Outlined.History,
-                expanded = expandedSection == "advanced",
+                expanded = expandedSections.contains("advanced"),
                 onHeaderClick = {
-                    expandedSection = if (expandedSection == "advanced") null else "advanced"
+                    expandedSections = if (expandedSections.contains("advanced")) {
+                        expandedSections - "advanced"
+                    } else {
+                        expandedSections + "advanced"
+                    }
                 }
             ) {
                 SettingClickableItem(
