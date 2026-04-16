@@ -505,7 +505,7 @@ private fun AppInfoSection() {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }.getOrNull()
     }
-    val versionName = packageInfo?.versionName ?: "1.0"
+    val versionName = packageInfo?.versionName ?: "0.0"
     val appName = stringResource(R.string.app_name)
 
     Column(
