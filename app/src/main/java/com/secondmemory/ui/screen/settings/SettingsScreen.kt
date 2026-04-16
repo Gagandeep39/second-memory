@@ -190,7 +190,6 @@ fun SettingsScreen(
                     ListItem(
                         headlineContent = { Text("Cloud Backup") },
                         supportingContent = { Text("Connect your Google account to sync your thoughts across devices.") },
-                        leadingContent = { Icon(Icons.Outlined.Cloud, null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
                     Button(
@@ -289,16 +288,6 @@ fun SettingsScreen(
                                 }
                             }
                         },
-                        leadingContent = {
-                            Icon(
-                                imageVector = when (settings.syncState) {
-                                    SyncState.ERROR -> Icons.Outlined.Info
-                                    else -> Icons.Outlined.Sync
-                                },
-                                contentDescription = null,
-                                tint = if (settings.syncState == SyncState.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            )
-                        },
                         trailingContent = {
                             if (settings.syncState == SyncState.SYNCING) {
                                 CircularProgressIndicator(
@@ -347,7 +336,6 @@ fun SettingsScreen(
                     SettingToggleItem(
                         title = "Daily Auto-Sync",
                         description = "Automatically backup in the background",
-                        icon = Icons.Outlined.Sync,
                         checked = settings.driveSyncEnabled,
                         enabled = !settings.connectedGoogleAccountEmail.isNullOrBlank(),
                         onCheckedChange = { enabled ->
@@ -469,7 +457,6 @@ fun SettingsScreen(
                 SettingToggleItem(
                     title = "Cloud Summaries",
                     description = "Generate daily summaries using AI",
-                    icon = Icons.Outlined.Cloud,
                     checked = settings.cloudSummaryEnabled,
                     enabled = settings.geminiApiKey.isNotBlank(),
                     onCheckedChange = { enabled ->
@@ -481,32 +468,6 @@ fun SettingsScreen(
                         }
                     },
                 )
-
-                if (settings.geminiApiKey.isBlank()) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = "Add API key to enable cloud summaries.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Outlined.Info,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
-                }
             }
 
             SettingsSection(
@@ -525,7 +486,7 @@ fun SettingsScreen(
                 SettingClickableItem(
                     title = "Operation Logs",
                     description = "View detailed synchronization and AI logs",
-                    icon = Icons.Outlined.History,
+                    // Removed redundant icon
                     onClick = onOpenOperationLogs
                 )
             }

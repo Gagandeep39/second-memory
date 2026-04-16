@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.BottomAppBarDefaults.windowInsets
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -87,7 +88,7 @@ fun OperationLogsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (logs.isEmpty()) {
@@ -96,58 +97,88 @@ fun OperationLogsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        // Top spacing
-                        item {
-                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
-                        }
-                        items(logs, key = { entry -> entry.id }) { entry ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    Text(
-                                        text = "${entry.category} • ${entry.status}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
+                         LazyColumn(
+                             modifier = Modifier.fillMaxSize(),
+                             verticalArrangement = Arrangement.spacedBy(4.dp),
+                         ) {
+                             // Top spacing
+                             item {
+                                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
+                             }
+                            items(logs.size, key = { idx -> logs[idx].id }) { idx ->
+                                val entry = logs[idx]
+                                 Column(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .padding(vertical = 4.dp, horizontal = 2.dp),
+                                     verticalArrangement = Arrangement.spacedBy(1.dp),
+                                 ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = entry.category,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = entry.status,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = when (entry.status) {
+                                                "SUCCESS" -> MaterialTheme.colorScheme.primary
+                                                "ERROR" -> MaterialTheme.colorScheme.error
+                                                "STARTED" -> MaterialTheme.colorScheme.secondary
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
+
                                     Text(
                                         text = entry.action,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(vertical = 1.dp)
                                     )
-                                    Text(
-                                        text = formatDateTime(entry.timestampMillis),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+
                                     entry.details?.let { details ->
                                         Text(
                                             text = details,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 1.dp)
                                         )
                                     }
-                                    entry.source?.let { source ->
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
                                         Text(
-                                            text = "source: $source",
+                                            text = formatDateTime(entry.timestampMillis),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = MaterialTheme.colorScheme.outline,
                                         )
+                                        entry.source?.let { source ->
+                                            Text(
+                                                text = source,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline,
+                                            )
+                                        }
                                     }
                                 }
+                                if (idx < logs.lastIndex) {
+                                    androidx.compose.material3.HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 2.dp, horizontal = 4.dp),
+                                        thickness = 0.7.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                }
                             }
-                        }
-                        // Bottom spacing
-                        item {
-                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
             }
         }
-    }
 }
