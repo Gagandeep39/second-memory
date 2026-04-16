@@ -84,17 +84,25 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.secondmemory.R
+import com.secondmemory.background.DriveSyncWorker
+import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.util.formatDateTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -294,27 +302,28 @@ fun SettingsScreen(
                             } else {
                                 IconButton(
                                     onClick = {
-                                        scope.launch {
-                                            runCatching {
-                                                settingsRepository.syncNow()
-                                            }.onSuccess {
-                                                driveStatusMessage = "Drive sync finished."
-                                            }.onFailure { error ->
-                                                val recoverableAuth = error as? UserRecoverableAuthException
-                                                    ?: error.cause as? UserRecoverableAuthException
-                                                val recoverableIoAuth = error as? UserRecoverableAuthIOException
-                                                    ?: error.cause as? UserRecoverableAuthIOException
-                                                if (recoverableAuth != null) {
-                                                    recoverableAuth.intent?.let { consentLauncher.launch(it) }
-                                                    driveStatusMessage = "Google authorization required."
-                                                } else if (recoverableIoAuth != null) {
-                                                    consentLauncher.launch(recoverableIoAuth.intent)
-                                                    driveStatusMessage = "Google authorization required."
-                                                } else {
-                                                    driveStatusMessage = "Sync failed: ${error.message}"
-                                                }
-                                            }
+                                        // Enqueue a one-time sync job in the background using DriveSyncWorker
+                                        val workManager = WorkManager.getInstance(context)
+                                        // Log manual sync trigger
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            DataStoreOperationLogRepository(context)
+                                                .appendLog(
+                                                    category = "WORK",
+                                                    action = "Manual sync triggered from settings",
+                                                    status = "STARTED",
+                                                    details = "User pressed Sync Now button",
+                                                    source = "SettingsScreen"
+                                            )
                                         }
+                                        val request = OneTimeWorkRequestBuilder<DriveSyncWorker>()
+                                            .setConstraints(
+                                                Constraints.Builder()
+                                                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                    .build()
+                                            )
+                                            .build()
+                                        workManager.enqueue(request)
+                                        driveStatusMessage = "Sync started in background."
                                     }
                                 ) {
                                     Icon(Icons.Outlined.Sync, contentDescription = "Sync Now")
