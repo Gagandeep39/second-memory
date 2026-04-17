@@ -30,6 +30,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/gradle-build-action@v3
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Build Release Bundle & APK
         run: |
           ./gradlew bundleRelease
