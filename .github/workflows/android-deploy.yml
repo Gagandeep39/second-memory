@@ -53,11 +53,19 @@ jobs:
           mkdir -p whatsNew
           echo "$NOTES" > whatsNew/whatsnew-en-US
 
+
       - name: Decode Keystore
         env:
           ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$ENCODED_KEYSTORE" | base64 -d > app/my-release-key.jks
+
+      - name: Set up signing environment variables
+        run: |
+          echo "SIGNING_KEY_PATH=$(pwd)/app/my-release-key.jks" >> $GITHUB_ENV
+          echo "SIGNING_KEY_STORE_PASSWORD=${{ secrets.SIGNING_KEY_STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "SIGNING_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "SIGNING_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
 
       - name: Set up Gradle
         uses: gradle/gradle-build-action@v3
