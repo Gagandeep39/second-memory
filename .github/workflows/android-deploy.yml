@@ -46,9 +46,12 @@ jobs:
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-          # Also write to file for GitHub Release body
+          # Write for GitHub Release
           echo "$NOTES" > RELEASE_CHANGELOG.md
+
+          # Write for Google Play whatsNew directory
+          mkdir -p whatsNew
+          echo "$NOTES" > whatsNew/whatsnew-en-US
 
       - name: Decode Keystore
         env:
@@ -66,29 +69,6 @@ jobs:
         run: |
           ./gradlew bundleRelease
           ./gradlew assembleRelease
-
-      - name: Extract Changelog for Version
-        id: changelog
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          
-          NOTES=$(awk "/^## ${VERSION}$/,/^## /" CHANGELOG.md \
-            | grep -v "^## ${VERSION}$" \
-            | grep -v "^## " \
-            | sed '/^[[:space:]]*$/d' \
-            | head -c 500)
-          
-          if [ -z "$NOTES" ]; then
-            NOTES="Bug fixes and performance improvements."
-          fi
-
-          # Write for GitHub Release
-          echo "$NOTES" > RELEASE_CHANGELOG.md
-
-          # Write for Google Play whatsNew directory
-          mkdir -p whatsNew
-          echo "$NOTES" > whatsNew/whatsnew-en-US
-
       - name: Upload AAB to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
