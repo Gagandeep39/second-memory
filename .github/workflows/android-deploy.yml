@@ -67,16 +67,37 @@ jobs:
           ./gradlew bundleRelease
           ./gradlew assembleRelease
 
+      - name: Extract Changelog for Version
+        id: changelog
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          NOTES=$(awk "/^## ${VERSION}$/,/^## /" CHANGELOG.md \
+            | grep -v "^## ${VERSION}$" \
+            | grep -v "^## " \
+            | sed '/^[[:space:]]*$/d' \
+            | head -c 500)
+          
+          if [ -z "$NOTES" ]; then
+            NOTES="Bug fixes and performance improvements."
+          fi
+
+          # Write for GitHub Release
+          echo "$NOTES" > RELEASE_CHANGELOG.md
+
+          # Write for Google Play whatsNew directory
+          mkdir -p whatsNew
+          echo "$NOTES" > whatsNew/whatsnew-en-US
+
       - name: Upload AAB to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.secondmemory
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          track: closed
+          track: alpha
           status: completed
-          releaseNotes: |
-            en-US=${{ steps.changelog.outputs.changelog }}
+          whatsNewDirectory: whatsNew
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
