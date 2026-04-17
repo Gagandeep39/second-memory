@@ -1,6 +1,5 @@
 name: Build & Deploy to Play Store
 
-
 on:
   push:
     branches:
@@ -20,6 +19,36 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 17
+
+      - name: Extract Version Name from build.gradle.kts
+        id: get_version
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Extract Changelog for Version
+        id: changelog
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Extract the block starting at "## $VERSION" up to the next "## " heading
+          NOTES=$(awk "/^## ${VERSION}$/,/^## /" CHANGELOG.md \
+            | grep -v "^## ${VERSION}$" \
+            | grep -v "^## " \
+            | sed '/^[[:space:]]*$/d' \
+            | head -c 500)
+          
+          if [ -z "$NOTES" ]; then
+            NOTES="Bug fixes and performance improvements."
+          fi
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Also write to file for GitHub Release body
+          echo "$NOTES" > RELEASE_CHANGELOG.md
 
       - name: Decode Keystore
         env:
@@ -42,14 +71,12 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.your.package.name
+          packageName: com.secondmemory
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
           track: closed
           status: completed
-          inAppUpdatePriority: 2
-          userFraction: 0.999
-        env:
-          SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          releaseNotes: |
+            en-US=${{ steps.changelog.outputs.changelog }}
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -73,3 +100,4 @@ jobs:
           files: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
+          body_path: RELEASE_CHANGELOG.md
