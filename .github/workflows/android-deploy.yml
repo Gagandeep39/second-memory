@@ -114,6 +114,8 @@ jobs:
         with:
           name: changelog
           path: .
+      - name: Checkout code for git tag
+        uses: actions/checkout@v4
       - name: Create and Push Tag for Version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
