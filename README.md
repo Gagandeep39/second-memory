@@ -2,43 +2,35 @@
 
 SecondMemory is an offline-first Android app for capturing raw thoughts, then generating and viewing daily markdown summaries.
 
-The current implementation emphasizes:
-1. File-based storage as the source of truth.
-2. Date-first access to raw and summary data.
-3. Optional cloud summarization via Gemini API.
-4. Minimal local persistence complexity (DataStore for app settings and operation logs).
-
 ## Current Feature Status
 
-Implemented:
-1. Adaptive top-level navigation with routes for Raw Thoughts, Daily View, Settings, and Record Thought.
-2. Launcher quick action (app icon long-press shortcut) for directly opening Record Thought.
-3. Home screen Quick Record widget that opens Record Thought with one tap.
-4. Record Thought runs as a dedicated activity without top-level navigation chrome.
-5. Record Thought screen with speech-to-text, auto-start listening, visualizer, manual editing, and save.
-6. Cursor-aware speech insertion (transcript inserts at current cursor/selection).
-7. Raw Thoughts date browsing with edit/delete over daily raw JSON files.
-8. Daily View summary cards (one per `data/daily/*.md`) with metadata:
-   - raw thought count for the same day key
-   - summary word count
-   - last summarized timestamp
-9. Daily summary detail screen with markdown rendering.
-10. Settings with:
-   - Google Drive sync toggle (foundation)
-   - Gemini API key save/test
-   - Cloud summaries toggle visible only when Gemini key exists
-11. Gemini-powered summary generation from raw JSON using Daily View FAB actions:
-   - `Summarize` FAB generates for today
-   - `Calendar` FAB opens date picker for a specific day
-12. Google Drive bidirectional sync engine for `data/raw`, `data/daily`, `data/weekly`, and `data/monthly` with conflict resolution.
-13. WorkManager background jobs:
-   - periodic Drive sync
-   - nightly summary regeneration with previous-day targeting
-   - shared network constraints and exponential backoff
-14. Operation log history screen (accessible from Settings) to audit sync/work/settings events.
+## Features
 
-Not yet implemented:
-1. Weekly and monthly summary generation pipelines.
+The application includes the following features:
+
+- Adaptive top-level navigation for Raw Thoughts, Daily View, Settings, and Record Thought screens
+- Launcher quick action (long-press app icon) to open Record Thought directly
+- Home screen Quick Record widget for one-tap access to Record Thought
+- Dedicated Record Thought activity without navigation chrome
+- Record Thought screen with Speech-to-text input, Manual editing
+- Cursor-aware speech insertion at current cursor/selection
+- Raw Thoughts browsing by date with edit and delete options (stored as daily JSON files)
+- Daily View with summary cards for each day
+- Daily summary detail screen with markdown rendering
+- Settings screen with:
+   - Google Drive sync toggle
+   - Gemini API key save/test
+   - Cloud summaries toggle (visible only when Gemini key exists)
+- Gemini-powered summary generation from raw JSON via Daily View actions:
+   - Summarize for today
+   - Summarize for a selected date (via calendar)
+- Google Drive bidirectional sync for raw, daily, weekly, and monthly data with conflict resolution
+- Background jobs using WorkManager:
+   - Periodic Drive sync
+   - Nightly summary regeneration (targets previous day)
+   - Shared network constraints and exponential backoff
+- Operation log history screen (from Settings) to audit sync, work, and settings events
+
 
 ## Architecture Overview
 
@@ -205,6 +197,25 @@ Build debug APK:
 ./gradlew :app:assembleDebug
 ```
 
+## CI/CD: Automated Build & Release Pipeline
+
+This repository uses a [GitHub Actions](.github/workflows/android-deploy.yml) workflow for automated build, signing, and deployment:
+
+- **Trigger:** Runs on every push to the `develop` branch.
+- **Build:** Builds signed release APK and AAB artifacts using a secure, base64-encoded keystore (provided via repository secrets).
+- **Changelog:** Extracts the latest release notes from [CHANGELOG.md](CHANGELOG.md) for use in releases and Play Store updates.
+- **GitHub Release:** Automatically creates a prerelease on GitHub with versioned tag, APK, AAB, and changelog.
+- **Play Store Release:** Uploads the AAB to the Play Store (track: `alpha` by default) using a service account key (provided via secrets).
+
+**Required secrets:**
+   - `KEYSTORE_BASE64`, `SIGNING_KEY_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` (for signing)
+   - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (for Play Store upload)
+
+**Required files:**
+   - `app/build.gradle.kts` must define `versionName = "x.y.z"`
+   - [CHANGELOG.md](CHANGELOG.md) must have a section for the current version
+
+
 ## Operational Notes
 
 1. If Gemini key is not saved, cloud summary toggle is hidden.
@@ -217,10 +228,3 @@ Build debug APK:
 
 Repository instructions for AI-assisted edits:
 1. [AGENTS.md](AGENTS.md)
-
-Important conventions:
-1. Keep thought and summary content file-based.
-2. Avoid introducing per-thought database storage.
-3. Preserve the canonical `data/` directory contract.
-4. Add or update KDoc for public Kotlin APIs when changing behavior.
-
