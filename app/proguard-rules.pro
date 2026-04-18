@@ -19,20 +19,38 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
-# Google API Client & Drive SDK - uses reflection for JSON parsing
--keep class com.google.api.services.drive.** { *; }
--keep class com.google.api.client.** { *; }
--keep class com.google.api.services.drive.model.** { *; }
 
-# Gson model serialization
--keepattributes Signature
--keepattributes *Annotation*
--keepclassmembers class com.google.api.services.drive.model.** {
+# ---- Apache HttpClient / Google API Client (Java SE classes not on Android) ----
+-dontwarn javax.naming.**
+-dontwarn javax.naming.directory.**
+-dontwarn javax.naming.ldap.**
+-dontwarn org.ietf.jgss.**
+-dontwarn org.apache.http.**
+
+# ---- Google Drive SDK + API Client (reflection/Gson based) ----
+-keep class com.google.api.services.drive.** { *; }
+-keep class com.google.api.services.drive.model.** { *; }
+-keep class com.google.api.client.** { *; }
+-keep class com.google.api.client.json.** { *; }
+-keep class com.google.api.client.googleapis.** { *; }
+-keep class com.google.api.client.http.** { *; }
+
+# ---- Keep all fields/methods on API model objects (deserialized via reflection) ----
+-keepclassmembers class * extends com.google.api.client.json.GenericJson {
     <fields>;
-    <init>(...);
+    *;
+}
+-keepclassmembers class * extends com.google.api.client.util.GenericData {
+    <fields>;
     *;
 }
 
-# Prevent stripping of generic type info used by Gson
+# ---- Gson / reflection metadata ----
+-keepattributes Signature
+-keepattributes *Annotation*
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
+
+# ---- Google Account Credential ----
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
