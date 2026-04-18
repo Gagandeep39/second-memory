@@ -19,3 +19,20 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Google API Client & Drive SDK - uses reflection for JSON parsing
+-keep class com.google.api.services.drive.** { *; }
+-keep class com.google.api.client.** { *; }
+-keep class com.google.api.services.drive.model.** { *; }
+
+# Gson model serialization
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepclassmembers class com.google.api.services.drive.model.** {
+    <fields>;
+    <init>(...);
+    *;
+}
+
+# Prevent stripping of generic type info used by Gson
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses

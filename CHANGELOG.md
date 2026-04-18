@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 5.0
+
+- Progaurd rules fixes
+
 ## 4.0
 
 - Implemented CICD releases (Requires pushing to develop branch)
