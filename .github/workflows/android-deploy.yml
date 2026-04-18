@@ -25,28 +25,21 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
+
       - name: Extract Changelog for Version
         id: changelog
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          
-          # Extract the block starting at "## $VERSION" up to the next "## " heading
-          NOTES=$(awk "/^## ${VERSION}$/,/^## /" CHANGELOG.md \
-            | grep -v "^## ${VERSION}$" \
-            | grep -v "^## " \
-            | sed '/^[[:space:]]*$/d' \
-            | head -c 500)
-          
+          # Extract lines between "## $VERSION" and the next heading, robust for single-line entries
+          NOTES=$(awk -v ver="## ${VERSION}" 'found && /^## / {exit} found {print} $0==ver {found=1}' CHANGELOG.md | sed '/^[[:space:]]*$/d' | head -c 500)
           if [ -z "$NOTES" ]; then
-            NOTES="Bug fixes and performance improvements."
+            NOTES="No Changelog found."
           fi
-          
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           # Write for GitHub Release
           echo "$NOTES" > RELEASE_CHANGELOG.md
-
           # Write for Google Play whatsNew directory
           mkdir -p whatsNew
           echo "$NOTES" > whatsNew/whatsnew-en-US
