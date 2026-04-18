@@ -8,14 +8,11 @@ on:
 jobs:
   version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 17
       - name: Extract Version Name
         id: get_version
         run: |
@@ -29,11 +26,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 17
       - name: Extract Changelog for Version
         id: changelog
         run: |
@@ -53,6 +45,12 @@ jobs:
         with:
           name: changelog
           path: RELEASE_CHANGELOG.md
+      - name: Upload whatsNew Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whats-new
+          path: whatsNew/
+
   build:
     runs-on: ubuntu-latest
     needs: changelog
@@ -96,9 +94,10 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, version]
     steps:
-      # No checkout or JDK setup needed, only artifacts are used
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Download APK Artifact
         uses: actions/download-artifact@v4
         with:
@@ -114,13 +113,11 @@ jobs:
         with:
           name: changelog
           path: .
-      - name: Checkout code for git tag
-        uses: actions/checkout@v4
       - name: Create and Push Tag for Version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          VERSION="${{ needs.version.outputs.version }}"
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git tag "$VERSION"
@@ -135,13 +132,27 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
           body_path: RELEASE_CHANGELOG.md
-    # To be uncommented later
-    # - name: Upload AAB to Play Store
-    #   uses: r0adkll/upload-google-play@v1
-    #   with:
-    #     serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-    #     packageName: com.secondmemory
-    #     releaseFiles: app/build/outputs/bundle/release/app-release.aab
-    #     track: alpha
-    #     status: completed
-    #     whatsNewDirectory: whatsNew
+
+  # deploy_play_store:
+  #   runs-on: ubuntu-latest
+  #   needs: [build, version]
+  #   steps:
+  #     - name: Download AAB Artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: app-release-aab
+  #         path: app/build/outputs/bundle/release/
+  #     - name: Download whatsNew Artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: whats-new
+  #         path: whatsNew/
+  #     - name: Upload AAB to Play Store
+  #       uses: r0adkll/upload-google-play@v1
+  #       with:
+  #         serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+  #         packageName: com.secondmemory
+  #         releaseFiles: app/build/outputs/bundle/release/app-release.aab
+  #         track: alpha
+  #         status: completed
+  #         whatsNewDirectory: whatsNew
