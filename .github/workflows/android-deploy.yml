@@ -1,3 +1,28 @@
+# =============================================================================
+# REQUIRED SECRETS (Settings → Secrets and variables → Actions → New secret)
+# =============================================================================
+# KEYSTORE_BASE64                  - Base64-encoded release keystore file
+#                                    Generate with: base64 -i my-release-key.jks | pbcopy
+# SIGNING_KEY_STORE_PASSWORD       - Password for the keystore file
+# SIGNING_KEY_ALIAS                - Key alias inside the keystore
+# SIGNING_KEY_PASSWORD             - Password for the key alias
+# GOOGLE_PLAY_SERVICE_ACCOUNT_JSON - Google Play service account JSON (plain text)
+#                                    Create at: Google Play Console → Setup → API access
+#
+# =============================================================================
+# REQUIRED VARIABLES (update directly in this file)
+# =============================================================================
+# packageName (release_playstore job) - Your app's application ID e.g. com.example.myapp
+# track       (release_playstore job) - Play Store track: internal | alpha (closed) | beta (open) | production
+#
+# =============================================================================
+# REQUIRED FILES IN REPOSITORY
+# =============================================================================
+# app/build.gradle.kts  - Must contain: versionName = "x.y.z"
+# CHANGELOG.md          - Must contain sections headed: ## x.y.z
+#
+# =============================================================================
+
 name: Build & Deploy to Github releases and Play store
 
 on:
@@ -92,7 +117,7 @@ jobs:
           name: app-release-aab
           path: app/build/outputs/bundle/release/app-release.aab
 
-  release:
+  release_github:
     runs-on: ubuntu-latest
     needs: [build, version]
     steps:
@@ -133,26 +158,26 @@ jobs:
             app/build/outputs/bundle/release/app-release.aab
           body_path: RELEASE_CHANGELOG.md
 
-  # deploy_play_store:
-  #   runs-on: ubuntu-latest
-  #   needs: [build, version]
-  #   steps:
-  #     - name: Download AAB Artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: app-release-aab
-  #         path: app/build/outputs/bundle/release/
-  #     - name: Download whatsNew Artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: whats-new
-  #         path: whatsNew/
-  #     - name: Upload AAB to Play Store
-  #       uses: r0adkll/upload-google-play@v1
-  #       with:
-  #         serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-  #         packageName: com.secondmemory
-  #         releaseFiles: app/build/outputs/bundle/release/app-release.aab
-  #         track: alpha
-  #         status: completed
-  #         whatsNewDirectory: whatsNew
+  release_playstore:
+    runs-on: ubuntu-latest
+    needs: [build, version, release_github]
+    steps:
+      - name: Download AAB Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-aab
+          path: app/build/outputs/bundle/release/
+      - name: Download whatsNew Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: whats-new
+          path: whatsNew/
+      - name: Upload AAB to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.secondmemory
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: alpha
+          status: completed
+          whatsNewDirectory: whatsNew
