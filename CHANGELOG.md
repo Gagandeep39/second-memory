@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 4.0
+
+- Implemented CICD releases (Requires pushing to develop branch)
+- Enabled minify for smaller build
+
 ## 3.0
 
 - No Change
