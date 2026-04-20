@@ -404,6 +404,13 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    Text(
+                        text = "Provider Settings",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+
                     // Provider Dropdown
                     var providerExpanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
@@ -560,6 +567,13 @@ fun SettingsScreen(
                             onClick = {
                                 scope.launch {
                                     settingsRepository.setAiConfig(aiProvider, aiBaseUrl, aiApiKey, aiModel)
+                                    DataStoreOperationLogRepository(context).appendLog(
+                                        category = "CONFIG",
+                                        action = "AI Configuration updated",
+                                        status = "SUCCESS",
+                                        details = "Provider: ${aiProvider.displayName}, Model: $aiModel",
+                                        source = "SettingsScreen"
+                                    )
                                     aiStatusMessage = "AI configuration saved."
                                 }
                             },
