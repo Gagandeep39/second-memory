@@ -156,12 +156,8 @@ fun DailyViewScreen(
 
     val summarizeDay: suspend (String) -> Unit = summarizeDay@{ dayKey ->
         val settings = settingsRepository.currentSettings()
-        if (settings.geminiApiKey.isBlank()) {
-            snackbarHostState.showSnackbar("Add Gemini API key in Settings before summarizing.")
-            return@summarizeDay
-        }
-        if (!settings.cloudSummaryEnabled) {
-            snackbarHostState.showSnackbar("Enable Cloud Summaries in Settings to summarize.")
+        if (settings.aiApiKey.isBlank()) {
+            snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
             return@summarizeDay
         }
 
@@ -177,7 +173,7 @@ fun DailyViewScreen(
             category = "SUMMARY",
             action = "Generate summary",
             status = "STARTED",
-            details = "dayKey=$dayKey",
+            details = "dayKey=$dayKey, provider=${settings.aiProvider}",
             source = "DailyViewScreen"
         )
 
@@ -185,7 +181,10 @@ fun DailyViewScreen(
             llmSummaryClient.summarizeDay(
                 dayKey = dayKey,
                 rawJson = rawJson,
-                apiKey = settings.geminiApiKey,
+                provider = settings.aiProvider,
+                baseUrl = settings.aiBaseUrl,
+                apiKey = settings.aiApiKey,
+                model = settings.aiModel
             )
         }.onSuccess { markdown ->
             runCatching {

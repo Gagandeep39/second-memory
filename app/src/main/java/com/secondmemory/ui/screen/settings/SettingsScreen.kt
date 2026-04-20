@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -96,12 +98,18 @@ import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.background.DriveSyncWorker
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.domain.llm.LlmSummaryClient
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.util.formatDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -122,18 +130,28 @@ fun SettingsScreen(
             connectedGoogleAccountEmail = null,
             cloudSummaryEnabled = false,
             geminiApiKey = "",
+            aiProvider = AIProvider.GEMINI,
+            aiBaseUrl = AIProvider.GEMINI.defaultBaseUrl,
+            aiApiKey = "",
+            aiModel = "gemini-1.5-flash-latest",
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
             lastSyncMessage = null,
         )
     )
-    var geminiApiKeyDraft by remember(settings.geminiApiKey) {
-        mutableStateOf(settings.geminiApiKey)
-    }
+    var aiProvider by remember(settings.aiProvider) { mutableStateOf(settings.aiProvider) }
+    var aiBaseUrl by remember(settings.aiBaseUrl) { mutableStateOf(settings.aiBaseUrl) }
+    var aiApiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
+    var aiModel by remember(settings.aiModel) { mutableStateOf(settings.aiModel) }
+    var aiApiKeyVisible by remember { mutableStateOf(false) }
+
+    var aiStatusMessage by remember { mutableStateOf<String?>(null) }
+    var availableModels by remember { mutableStateOf(emptyList<String>()) }
+    var isFetchingModels by remember { mutableStateOf(false) }
+
     val googleWebClientId = stringResource(R.string.google_web_client_id)
     val context = LocalContext.current
     val credentialManager = CredentialManager.create(context)
-    var geminiStatusMessage by remember { mutableStateOf<String?>(null) }
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
     var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
     val consentLauncher = rememberLauncherForActivityResult(
@@ -371,7 +389,7 @@ fun SettingsScreen(
             // --- AI Features Section ---
             SettingsSection(
                 title = "AI Features",
-                description = "Configure API key to generate summaries by invoking LLM",
+                description = "Configure AI provider and model for summaries",
                 icon = Icons.Outlined.Cloud,
                 expanded = expandedSections.contains("ai"),
                 onHeaderClick = {
@@ -386,45 +404,181 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Provider Dropdown
+                    var providerExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = providerExpanded,
+                        onExpandedChange = { providerExpanded = !providerExpanded },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = aiProvider.displayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("AI Provider") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large
+                        )
+                        ExposedDropdownMenu(
+                            expanded = providerExpanded,
+                            onDismissRequest = { providerExpanded = false }
+                        ) {
+                            AIProvider.entries.forEach { provider ->
+                                DropdownMenuItem(
+                                    text = { Text(provider.displayName) },
+                                    onClick = {
+                                        aiProvider = provider
+                                        aiBaseUrl = provider.defaultBaseUrl
+                                        providerExpanded = false
+                                        // Reset model when provider changes
+                                        aiModel = if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""
+                                        availableModels = emptyList()
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Base URL
                     OutlinedTextField(
-                        value = geminiApiKeyDraft,
-                        onValueChange = { geminiApiKeyDraft = it },
+                        value = aiBaseUrl,
+                        onValueChange = { 
+                            aiBaseUrl = it
+                            availableModels = emptyList()
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Gemini API Key") },
-                        leadingIcon = { Icon(Icons.Outlined.VpnKey, null) },
-                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("Base URL") },
+                        placeholder = { Text("https://api.openai.com/v1") },
                         singleLine = true,
                         shape = MaterialTheme.shapes.large
                     )
+
+                    // API Key
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            value = aiApiKey,
+                            onValueChange = {
+                                aiApiKey = it
+                                availableModels = emptyList()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("API Key") },
+                            leadingIcon = { Icon(Icons.Outlined.VpnKey, null) },
+                            trailingIcon = {
+                                IconButton(onClick = { aiApiKeyVisible = !aiApiKeyVisible }) {
+                                    Icon(
+                                        imageVector = if (aiApiKeyVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                        contentDescription = if (aiApiKeyVisible) "Hide API Key" else "Show API Key"
+                                    )
+                                }
+                            },
+                            visualTransformation = if (aiApiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.large
+                        )
+                        if (aiProvider != AIProvider.CUSTOM) {
+                            Text(
+                                text = "Needed to list all available models. Incorrect key will give no models.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                        }
+                    }
+
+                    // Model Autocomplete
+                    var modelExpanded by remember { mutableStateOf(false) }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ExposedDropdownMenuBox(
+                            expanded = modelExpanded,
+                            onExpandedChange = {
+                                if (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM) {
+                                    modelExpanded = !modelExpanded
+                                    if (modelExpanded && availableModels.isEmpty()) {
+                                        scope.launch {
+                                            isFetchingModels = true
+                                            availableModels = llmSummaryClient.fetchModels(aiProvider, aiBaseUrl, aiApiKey)
+                                            isFetchingModels = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = aiModel,
+                                onValueChange = { aiModel = it },
+                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+                                label = { Text("Model") },
+                                trailingIcon = {
+                                    if (isFetchingModels) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelExpanded)
+                                    }
+                                },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                shape = MaterialTheme.shapes.large
+                            )
+                            if (availableModels.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = modelExpanded,
+                                    onDismissRequest = { modelExpanded = false }
+                                ) {
+                                    availableModels.filter { it.contains(aiModel, ignoreCase = true) }.forEach { modelName ->
+                                        DropdownMenuItem(
+                                            text = { Text(modelName) },
+                                            onClick = {
+                                                aiModel = modelName
+                                                modelExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            text = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
+                                "⚠️ API key is needed to list all available models" 
+                            else "Select or type the model ID (e.g. gpt-4o, gemini-1.5-pro)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
+                                MaterialTheme.colorScheme.error 
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(
+                        Button(
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 scope.launch {
-                                    settingsRepository.setGeminiApiKey(geminiApiKeyDraft)
-                                    geminiStatusMessage = "Gemini key saved."
+                                    settingsRepository.setAiConfig(aiProvider, aiBaseUrl, aiApiKey, aiModel)
+                                    aiStatusMessage = "AI configuration saved."
                                 }
                             },
                         ) {
-                            Text("Save Key")
+                            Text("Save")
                         }
 
-                        Button(
+                        OutlinedButton(
                             modifier = Modifier.weight(1f),
-                            enabled = geminiApiKeyDraft.isNotBlank(),
+                            enabled = (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM) && aiModel.isNotBlank(),
                             onClick = {
                                 scope.launch {
-                                    geminiStatusMessage = "Testing Gemini key..."
+                                    aiStatusMessage = "Testing connection..."
                                     runCatching {
-                                        llmSummaryClient.testConnection(geminiApiKeyDraft)
+                                        llmSummaryClient.testConnection(aiProvider, aiBaseUrl, aiApiKey, aiModel)
                                     }.onSuccess {
-                                        geminiStatusMessage = "Gemini key is valid."
+                                        aiStatusMessage = "Connection successful!"
                                     }.onFailure { error ->
-                                        geminiStatusMessage = "Test failed: ${error.message}"
+                                        aiStatusMessage = "Test failed: ${error.message}"
                                     }
                                 }
                             },
@@ -434,12 +588,12 @@ fun SettingsScreen(
                     }
 
                     AnimatedVisibility(
-                        visible = geminiStatusMessage != null,
+                        visible = aiStatusMessage != null,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Text(
-                            text = geminiStatusMessage ?: "",
+                            text = aiStatusMessage ?: "",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -456,7 +610,7 @@ fun SettingsScreen(
                     title = "Cloud Summaries",
                     description = "Generate daily summaries using AI",
                     checked = settings.cloudSummaryEnabled,
-                    enabled = settings.geminiApiKey.isNotBlank(),
+                    enabled = settings.aiApiKey.isNotBlank() || settings.aiProvider == AIProvider.CUSTOM,
                     onCheckedChange = { enabled ->
                         scope.launch {
                             settingsRepository.setCloudSummaryEnabled(enabled)

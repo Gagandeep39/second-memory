@@ -4,13 +4,14 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
-import com.secondmemory.data.llm.GeminiLlmSummaryClient
+import com.secondmemory.data.llm.DefaultLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.data.drive.GoogleDriveSyncClient
+import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.util.ensureAppDataDirectories
 import com.secondmemory.util.shiftDayKey
 import com.secondmemory.util.todayDayKey
@@ -36,7 +37,7 @@ class DailySummaryWorker(
     )
     private val thoughtRepository = JsonThoughtRepository(appContext)
     private val dailySummaryRepository = FileDailySummaryRepository(appContext)
-    private val llmSummaryClient = GeminiLlmSummaryClient()
+    private val llmSummaryClient = DefaultLlmSummaryClient()
 
     override suspend fun doWork(): Result {
         operationLogRepository.appendLog(
@@ -76,7 +77,10 @@ class DailySummaryWorker(
             val markdown = llmSummaryClient.summarizeDay(
                 dayKey = targetDayKey,
                 rawJson = rawJson,
-                apiKey = settings.geminiApiKey,
+                provider = settings.aiProvider,
+                baseUrl = settings.aiBaseUrl,
+                apiKey = settings.aiApiKey,
+                model = settings.aiModel
             )
             dailySummaryRepository.saveSummaryForDay(targetDayKey, markdown)
             operationLogRepository.appendLog(

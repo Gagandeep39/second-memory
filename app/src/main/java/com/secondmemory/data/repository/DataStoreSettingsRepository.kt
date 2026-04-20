@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncMetadata
 import com.secondmemory.domain.model.SyncState
@@ -73,8 +74,7 @@ class DataStoreSettingsRepository(
 
     override suspend fun setCloudSummaryEnabled(enabled: Boolean) {
         context.appSettingsStore.edit { prefs ->
-            val hasGeminiKey = !(prefs[Keys.GEMINI_API_KEY] ?: "").isBlank()
-            prefs[Keys.CLOUD_SUMMARY_ENABLED] = enabled && hasGeminiKey
+            prefs[Keys.CLOUD_SUMMARY_ENABLED] = enabled
         }
         operationLogRepository.appendLog(
             category = "SETTINGS",
@@ -89,15 +89,45 @@ class DataStoreSettingsRepository(
         context.appSettingsStore.edit { prefs ->
             val trimmed = apiKey.trim()
             prefs[Keys.GEMINI_API_KEY] = trimmed
+            // Also update the new AI fields for backward compatibility/migration
+            prefs[Keys.AI_API_KEY] = trimmed
+            prefs[Keys.AI_PROVIDER] = AIProvider.GEMINI.name
+            prefs[Keys.AI_BASE_URL] = AIProvider.GEMINI.defaultBaseUrl
+            // Default Gemini model if not set
+            if ((prefs[Keys.AI_MODEL] ?: "").isBlank()) {
+                prefs[Keys.AI_MODEL] = "gemini-1.5-flash-latest"
+            }
+
             if (trimmed.isBlank()) {
                 prefs[Keys.CLOUD_SUMMARY_ENABLED] = false
             }
         }
         operationLogRepository.appendLog(
             category = "SETTINGS",
-            action = "Gemini API key updated",
+            action = "Gemini API key updated (legacy)",
             status = "SUCCESS",
             details = if (apiKey.isBlank()) "Cleared" else "Saved",
+            source = "DataStoreSettingsRepository",
+        )
+    }
+
+    override suspend fun setAiConfig(
+        provider: AIProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String
+    ) {
+        context.appSettingsStore.edit { prefs ->
+            prefs[Keys.AI_PROVIDER] = provider.name
+            prefs[Keys.AI_BASE_URL] = baseUrl.trim()
+            prefs[Keys.AI_API_KEY] = apiKey.trim()
+            prefs[Keys.AI_MODEL] = model.trim()
+        }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "AI config updated",
+            status = "SUCCESS",
+            details = "provider=${provider.name}, model=$model",
             source = "DataStoreSettingsRepository",
         )
     }
@@ -115,14 +145,21 @@ class DataStoreSettingsRepository(
      */
     private fun Preferences.toAppSettings(syncMetadata: SyncMetadata): AppSettings {
         val connectedAccount = this[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL]
-        val geminiKey = this[Keys.GEMINI_API_KEY] ?: ""
-        val cloudEnabled = (this[Keys.CLOUD_SUMMARY_ENABLED] ?: true) && geminiKey.isNotBlank()
+        val providerName = this[Keys.AI_PROVIDER] ?: AIProvider.GEMINI.name
+        val provider = runCatching { AIProvider.valueOf(providerName) }.getOrDefault(AIProvider.GEMINI)
+        val aiApiKey = this[Keys.AI_API_KEY] ?: this[Keys.GEMINI_API_KEY] ?: ""
+        val cloudEnabled = this[Keys.CLOUD_SUMMARY_ENABLED] ?: false
         val driveEnabled = (this[Keys.DRIVE_SYNC_ENABLED] ?: false) && !connectedAccount.isNullOrBlank()
+
         return AppSettings(
             driveSyncEnabled = driveEnabled,
             connectedGoogleAccountEmail = connectedAccount,
             cloudSummaryEnabled = cloudEnabled,
-            geminiApiKey = geminiKey,
+            geminiApiKey = this[Keys.GEMINI_API_KEY] ?: "",
+            aiProvider = provider,
+            aiBaseUrl = this[Keys.AI_BASE_URL] ?: provider.defaultBaseUrl,
+            aiApiKey = aiApiKey,
+            aiModel = this[Keys.AI_MODEL] ?: (if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""),
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
@@ -137,5 +174,10 @@ class DataStoreSettingsRepository(
         val CONNECTED_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("connected_google_account_email")
         val CLOUD_SUMMARY_ENABLED = booleanPreferencesKey("cloud_summary_enabled")
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+
+        val AI_PROVIDER = stringPreferencesKey("ai_provider")
+        val AI_BASE_URL = stringPreferencesKey("ai_base_url")
+        val AI_API_KEY = stringPreferencesKey("ai_api_key")
+        val AI_MODEL = stringPreferencesKey("ai_model")
     }
 }

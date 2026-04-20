@@ -36,7 +36,18 @@ interface SettingsRepository {
     /**
      * Stores a Gemini API key used for cloud summary generation.
      */
+    @Deprecated("Use setAiConfig instead")
     suspend fun setGeminiApiKey(apiKey: String)
+
+    /**
+     * Updates AI configuration.
+     */
+    suspend fun setAiConfig(
+        provider: com.secondmemory.domain.model.AIProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String
+    )
 
     /**
      * Streams the current sync metadata and subsequent updates.
