@@ -189,9 +189,9 @@ Input: JSON containing timestamped thoughts captured throughout a single day.
 
 Instructions: 
 - Return valid markdown only. 
-- Be concise but meaningful. Target ~150–300 words total. 
-- Remove noise, repetition, and low-value thoughts. 
-- Infer intent where needed, but do not hallucinate new events. 
+- Be concise but meaningful. Infer intent where needed, but do not invent details.
+- Do not condense long stories into short summaries and do not expand short notes into longer essays.
+- Remove noise, repetition, and low-value thoughts.
 - Merge similar thoughts into a single idea. 
 - Preserve chronological flow where helpful. 
 
@@ -208,6 +208,6 @@ List concrete things completed or meaningful progress made.
 ## Things to do 
 List actionable follow-ups or pending tasks inferred from the thoughts. 
 - Keep each item short and specific 
-- No more than 10 items"""
+"""
     }
 }
