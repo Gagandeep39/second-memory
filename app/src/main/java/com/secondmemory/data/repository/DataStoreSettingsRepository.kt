@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncMetadata
@@ -23,12 +25,25 @@ private val Context.appSettingsStore: DataStore<Preferences> by preferencesDataS
 
 /**
  * DataStore-backed settings repository for feature toggles and preferences.
+ * Sensitive data like API keys are stored in EncryptedSharedPreferences.
  */
 class DataStoreSettingsRepository(
     private val context: Context,
     private val syncRepository: SyncRepository,
 ) : SettingsRepository {
     private val operationLogRepository = DataStoreOperationLogRepository(context)
+
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val securePrefs = EncryptedSharedPreferences.create(
+        context,
+        "secure_settings",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     override fun observeSettings(): Flow<AppSettings> {
         return context.appSettingsStore.data.combine(syncRepository.observeSyncMetadata()) { preferences, syncMetadata ->
@@ -85,35 +100,6 @@ class DataStoreSettingsRepository(
         )
     }
 
-    override suspend fun setGeminiApiKey(apiKey: String) {
-        context.appSettingsStore.edit { prefs ->
-            val trimmed = apiKey.trim()
-            prefs[Keys.GEMINI_API_KEY] = trimmed
-            // Also update the new AI fields for backward compatibility/migration
-            prefs[Keys.AI_API_KEY] = trimmed
-            prefs[Keys.AI_PROVIDER] = AIProvider.GEMINI.name
-            prefs[Keys.AI_BASE_URL] = AIProvider.GEMINI.defaultBaseUrl
-            // Default Gemini model and prompt if not set
-            if ((prefs[Keys.AI_MODEL] ?: "").isBlank()) {
-                prefs[Keys.AI_MODEL] = "gemini-1.5-flash-latest"
-            }
-            if ((prefs[Keys.CUSTOM_PROMPT] ?: "").isBlank()) {
-                prefs[Keys.CUSTOM_PROMPT] = DEFAULT_PROMPT
-            }
-
-            if (trimmed.isBlank()) {
-                prefs[Keys.CLOUD_SUMMARY_ENABLED] = false
-            }
-        }
-        operationLogRepository.appendLog(
-            category = "SETTINGS",
-            action = "Gemini API key updated (legacy)",
-            status = "SUCCESS",
-            details = if (apiKey.isBlank()) "Cleared" else "Saved",
-            source = "DataStoreSettingsRepository",
-        )
-    }
-
     override suspend fun setAiConfig(
         provider: AIProvider,
         baseUrl: String,
@@ -121,16 +107,17 @@ class DataStoreSettingsRepository(
         model: String,
         customPrompt: String
     ) {
+        securePrefs.edit().putString(Keys.SECURE_AI_API_KEY, apiKey.trim()).apply()
+
         context.appSettingsStore.edit { prefs ->
             prefs[Keys.AI_PROVIDER] = provider.name
             prefs[Keys.AI_BASE_URL] = baseUrl.trim()
-            prefs[Keys.AI_API_KEY] = apiKey.trim()
             prefs[Keys.AI_MODEL] = model.trim()
             prefs[Keys.CUSTOM_PROMPT] = customPrompt.trim()
         }
         operationLogRepository.appendLog(
             category = "SETTINGS",
-            action = "AI config updated",
+            action = "AI config updated (secure)",
             status = "SUCCESS",
             details = "provider=${provider.name}, model=$model",
             source = "DataStoreSettingsRepository",
@@ -154,7 +141,10 @@ class DataStoreSettingsRepository(
         val connectedAccount = this[Keys.CONNECTED_GOOGLE_ACCOUNT_EMAIL]
         val providerName = this[Keys.AI_PROVIDER] ?: AIProvider.GEMINI.name
         val provider = runCatching { AIProvider.valueOf(providerName) }.getOrDefault(AIProvider.GEMINI)
-        val aiApiKey = this[Keys.AI_API_KEY] ?: this[Keys.GEMINI_API_KEY] ?: ""
+        
+        // Read only from secure storage
+        val aiApiKey = securePrefs.getString(Keys.SECURE_AI_API_KEY, "") ?: ""
+            
         val cloudEnabled = this[Keys.CLOUD_SUMMARY_ENABLED] ?: false
         val driveEnabled = (this[Keys.DRIVE_SYNC_ENABLED] ?: false) && !connectedAccount.isNullOrBlank()
 
@@ -162,7 +152,7 @@ class DataStoreSettingsRepository(
             driveSyncEnabled = driveEnabled,
             connectedGoogleAccountEmail = connectedAccount,
             cloudSummaryEnabled = cloudEnabled,
-            geminiApiKey = this[Keys.GEMINI_API_KEY] ?: "",
+            geminiApiKey = aiApiKey,
             aiProvider = provider,
             aiBaseUrl = this[Keys.AI_BASE_URL] ?: provider.defaultBaseUrl,
             aiApiKey = aiApiKey,
@@ -181,13 +171,14 @@ class DataStoreSettingsRepository(
         val DRIVE_SYNC_ENABLED = booleanPreferencesKey("drive_sync_enabled")
         val CONNECTED_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("connected_google_account_email")
         val CLOUD_SUMMARY_ENABLED = booleanPreferencesKey("cloud_summary_enabled")
-        val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
 
         val AI_PROVIDER = stringPreferencesKey("ai_provider")
         val AI_BASE_URL = stringPreferencesKey("ai_base_url")
-        val AI_API_KEY = stringPreferencesKey("ai_api_key")
         val AI_MODEL = stringPreferencesKey("ai_model")
         val CUSTOM_PROMPT = stringPreferencesKey("custom_prompt")
+        
+        // Key for EncryptedSharedPreferences
+        const val SECURE_AI_API_KEY = "ai_api_key"
     }
 
     private companion object {

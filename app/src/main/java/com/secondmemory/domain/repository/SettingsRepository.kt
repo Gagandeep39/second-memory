@@ -34,12 +34,6 @@ interface SettingsRepository {
     suspend fun setCloudSummaryEnabled(enabled: Boolean)
 
     /**
-     * Stores a Gemini API key used for cloud summary generation.
-     */
-    @Deprecated("Use setAiConfig instead")
-    suspend fun setGeminiApiKey(apiKey: String)
-
-    /**
      * Updates AI configuration.
      */
     suspend fun setAiConfig(
