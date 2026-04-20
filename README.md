@@ -2,8 +2,6 @@
 
 SecondMemory is an offline-first Android app for capturing raw thoughts, then generating and viewing daily markdown summaries.
 
-## Current Feature Status
-
 ## Features
 
 The application includes the following features:
@@ -17,10 +15,14 @@ The application includes the following features:
 - Raw Thoughts browsing by date with edit and delete options (stored as daily JSON files)
 - Daily View with summary cards for each day
 - Daily summary detail screen with markdown rendering
+- Users can edit the AI summarization prompt in Settings, allowing for personalized summary instructions.
+- Easily switch between any custom, or cloud LLM endpoints in Settings.
 - Settings screen with:
    - Google Drive sync toggle
    - Gemini API key save/test
    - Cloud summaries toggle (visible only when Gemini key exists)
+   - Custom prompt editor for daily summaries
+   - LLM provider/model/base URL selection
 - Gemini-powered summary generation from raw JSON via Daily View actions:
    - Summarize for today
    - Summarize for a selected date (via calendar)
@@ -75,21 +77,24 @@ Raw thought repository:
 Daily summary repository:
 1. [app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt](app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt)
 
-## Cloud Summary Flow (Gemini)
+
+## Cloud Summary Flow (Custom LLM)
 
 User flow:
 1. Open Settings.
-2. Enter and save Gemini API key.
-3. Test Gemini key.
-4. Enable Cloud Summaries toggle.
-5. In Daily View, either tap `Summarize` for today or use `Calendar` to pick a specific date.
-6. App reads `data/raw/yyyymmdd.json`, calls Gemini, writes `data/daily/yyyymmdd.md`.
+2. Select LLM provider (Gemini, custom, or local).
+3. Enter and save API key (stored securely).
+4. Optionally edit the daily summary prompt for personalized instructions.
+5. Test LLM connection.
+6. Enable Cloud Summaries toggle.
+7. In Daily View, either tap `Summarize` for today or use `Calendar` to pick a specific date.
+8. App reads `data/raw/yyyymmdd.json`, calls the selected LLM, writes `data/daily/yyyymmdd.md`.
 
-LLM abstraction (future-ready for multiple providers):
+LLM abstraction (multi-provider ready):
 1. [app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt](app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt)
 
-Gemini implementation:
-1. [app/src/main/java/com/secondmemory/data/llm/GeminiLlmSummaryClient.kt](app/src/main/java/com/secondmemory/data/llm/GeminiLlmSummaryClient.kt)
+Custom LLM implementation:
+1. [app/src/main/java/com/secondmemory/data/llm/DefaultLlmSummaryClient.kt](app/src/main/java/com/secondmemory/data/llm/DefaultLlmSummaryClient.kt)
 
 Settings repository and model:
 1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSettingsRepository.kt)
