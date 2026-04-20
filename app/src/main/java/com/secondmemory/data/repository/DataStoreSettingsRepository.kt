@@ -161,6 +161,7 @@ class DataStoreSettingsRepository(
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
+            driveFolderId = syncMetadata.driveFolderId,
         )
     }
 

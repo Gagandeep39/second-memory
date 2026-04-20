@@ -7,4 +7,5 @@ data class SyncMetadata(
     val state: SyncState,
     val lastSyncAtMillis: Long?,
     val lastSyncMessage: String?,
+    val driveFolderId: String? = null,
 )

@@ -8,4 +8,5 @@ data class DriveSyncReport(
     val downloadedCount: Int,
     val deletedCount: Int,
     val conflictedCount: Int,
+    val rootFolderId: String? = null,
 )

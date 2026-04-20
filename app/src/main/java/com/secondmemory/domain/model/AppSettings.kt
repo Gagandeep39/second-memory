@@ -16,4 +16,5 @@ data class AppSettings(
     val syncState: SyncState,
     val lastSyncAtMillis: Long?,
     val lastSyncMessage: String?,
+    val driveFolderId: String?,
 )

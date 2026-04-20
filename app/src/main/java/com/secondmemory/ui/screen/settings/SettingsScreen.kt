@@ -136,7 +136,7 @@ fun SettingsScreen(
             aiProvider = AIProvider.GEMINI,
             aiBaseUrl = AIProvider.GEMINI.defaultBaseUrl,
             aiApiKey = "",
-            aiModel = "gemini-1.5-flash-latest",
+            aiModel = "",
             customPrompt = "",
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
@@ -289,7 +289,7 @@ fun SettingsScreen(
                         headlineContent = {
                             Text(
                                 text = when (settings.syncState) {
-                                    SyncState.IDLE -> "Sync Status"
+                                    SyncState.IDLE -> "Sync now"
                                     SyncState.SYNCING -> "Syncing now..."
                                     SyncState.SUCCESS -> "Sync Succeeded"
                                     SyncState.ERROR -> "Sync Failed"

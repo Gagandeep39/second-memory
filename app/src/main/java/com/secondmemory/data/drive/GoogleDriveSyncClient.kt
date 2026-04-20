@@ -122,6 +122,7 @@ class GoogleDriveSyncClient(
             downloadedCount = downloaded,
             deletedCount = deleted,
             conflictedCount = conflicted,
+            rootFolderId = rootFolderId,
         )
     }
 

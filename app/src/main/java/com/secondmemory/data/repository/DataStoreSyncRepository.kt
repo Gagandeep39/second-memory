@@ -88,6 +88,7 @@ class DataStoreSyncRepository(
                     prefs[Keys.STATE] = SyncState.SUCCESS.name
                     prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
                     prefs[Keys.LAST_MESSAGE] = message
+                    report.rootFolderId?.let { prefs[Keys.DRIVE_FOLDER_ID] = it }
                 }
                 operationLogRepository.appendLog(
                     category = "SYNC",
@@ -125,6 +126,7 @@ class DataStoreSyncRepository(
             state = state,
             lastSyncAtMillis = this[Keys.LAST_SYNC_AT],
             lastSyncMessage = this[Keys.LAST_MESSAGE],
+            driveFolderId = this[Keys.DRIVE_FOLDER_ID],
         )
     }
 
@@ -160,5 +162,6 @@ class DataStoreSyncRepository(
         val STATE = stringPreferencesKey("sync_state")
         val LAST_SYNC_AT = longPreferencesKey("sync_last_at")
         val LAST_MESSAGE = stringPreferencesKey("sync_last_message")
+        val DRIVE_FOLDER_ID = stringPreferencesKey("sync_drive_folder_id")
     }
 }
