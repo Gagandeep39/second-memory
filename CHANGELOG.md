@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 6.0
+
+- Fixed Sync now issue (Removed deprecated credential logic in google drive call)
+- Changed target SDK to 37
+
 ## 5.0
 
 - Progaurd rules fixes
