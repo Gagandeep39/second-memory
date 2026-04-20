@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 7.0
+
+- Add an option to customize summary prompt in settings
+- Add CICD automation for building and deploying the app
+- Key must be in secured shared preference
+- Publish on google play store
+- Add support for different LLM connections (including local models)
 
 ## 6.0
 
