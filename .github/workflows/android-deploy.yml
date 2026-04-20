@@ -181,6 +181,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.secondmemory
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          track: alpha
+          tracks: alpha
           status: completed
           whatsNewDirectory: whatsNew
