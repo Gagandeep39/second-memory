@@ -14,9 +14,9 @@ android {
     defaultConfig {
         applicationId = "com.secondmemory"
         minSdk = 33
-        targetSdk = 36
-        versionCode = 5
-        versionName = "5.0"
+        targetSdk = 37
+        versionCode = 6
+        versionName = "6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
