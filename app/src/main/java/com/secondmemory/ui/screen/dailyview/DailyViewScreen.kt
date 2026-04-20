@@ -471,7 +471,7 @@ fun DailyViewScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Tap the + icon or Summarize to generate one",
+                                text = "Tap to generate a summary of your daily reflections",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )

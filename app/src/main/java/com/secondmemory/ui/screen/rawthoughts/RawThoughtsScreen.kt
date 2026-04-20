@@ -305,7 +305,7 @@ fun RawThoughtsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Tap Record to capture your first entry for this day",
+                            text = "Hit capture to start today's first entry",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
