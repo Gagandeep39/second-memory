@@ -99,9 +99,9 @@ import com.secondmemory.background.DriveSyncWorker
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.domain.llm.LlmSummaryClient
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncState
@@ -425,7 +425,7 @@ fun SettingsScreen(
                             label = { Text("AI Provider") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerExpanded) },
                             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                             shape = MaterialTheme.shapes.large
                         )
                         ExposedDropdownMenu(
@@ -517,7 +517,7 @@ fun SettingsScreen(
                             OutlinedTextField(
                                 value = aiModel,
                                 onValueChange = { aiModel = it },
-                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+                                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                                 label = { Text("Model") },
                                 trailingIcon = {
                                     if (isFetchingModels) {
