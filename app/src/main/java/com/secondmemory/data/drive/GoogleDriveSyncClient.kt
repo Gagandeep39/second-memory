@@ -1,7 +1,11 @@
 package com.secondmemory.data.drive
 
+import android.accounts.Account
 import android.content.Context
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.Scope
+import com.google.android.gms.tasks.Tasks
 import com.google.api.client.http.AbstractInputStreamContent
 import com.google.api.client.http.ByteArrayContent
 import com.google.api.client.http.FileContent
@@ -40,18 +44,24 @@ class GoogleDriveSyncClient(
     suspend fun syncLocalDataTree(accountEmail: String?): DriveSyncReport = withContext(Dispatchers.IO) {        val selectedEmail = accountEmail?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Connect a Google account before syncing.")
 
-        val credential = GoogleAccountCredential.usingOAuth2(
-            context,
-            listOf(DriveScopes.DRIVE_FILE),
-        ).apply {
-            selectedAccountName = selectedEmail
-        }
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(DriveScopes.DRIVE_FILE)))
+            .setAccount(Account(selectedEmail, "com.google"))
+            .build()
+        
+        val authorizationResult = Tasks.await(
+            Identity.getAuthorizationClient(context).authorize(request)
+        )
+
+        val accessToken = authorizationResult.accessToken
+            ?: throw IllegalStateException("Failed to obtain Drive access token.")
 
         val driveService = Drive.Builder(
             NetHttpTransport(),
-            GsonFactory.getDefaultInstance(),
-            credential,
-        ).setApplicationName(APP_NAME).build()
+            GsonFactory.getDefaultInstance()
+        ) { httpRequest ->
+            httpRequest.headers.authorization = "Bearer $accessToken"
+        }.setApplicationName(APP_NAME).build()
 
         val rootFolderId = ensureFolder(driveService, null, ROOT_FOLDER_NAME)
         val dataFolderId = ensureFolder(driveService, rootFolderId, DATA_FOLDER_NAME)
