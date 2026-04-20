@@ -81,7 +81,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -141,8 +145,12 @@ fun SettingsScreen(
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
             lastSyncMessage = null,
+            driveFolderId = null
         )
     )
+
+    val clipboardManager = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
     var aiProvider by remember(settings.aiProvider) { mutableStateOf(settings.aiProvider) }
     var aiBaseUrl by remember(settings.aiBaseUrl) { mutableStateOf(settings.aiBaseUrl) }
     var aiApiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
@@ -150,12 +158,12 @@ fun SettingsScreen(
     var customPrompt by remember(settings.customPrompt) { mutableStateOf(settings.customPrompt) }
     var aiApiKeyVisible by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     var aiStatusMessage by remember { mutableStateOf<String?>(null) }
     var availableModels by remember { mutableStateOf(emptyList<String>()) }
     var isFetchingModels by remember { mutableStateOf(false) }
 
     val googleWebClientId = stringResource(R.string.google_web_client_id)
-    val context = LocalContext.current
     val credentialManager = CredentialManager.create(context)
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
     var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -276,6 +284,46 @@ fun SettingsScreen(
                             }
                         },
                         leadingContent = { Icon(Icons.Outlined.AccountCircle, null) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    val folderId = settings.driveFolderId
+                    val driveUrl = folderId?.let { "https://drive.google.com/drive/folders/$it" }
+
+                    ListItem(
+                        headlineContent = { Text("View in Google Drive") },
+                        supportingContent = {
+                            Text(
+                                text = driveUrl ?: "Link will be available after the first successful sync",
+                                maxLines = if (driveUrl == null) 2 else 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        trailingContent = {
+                            if (driveUrl != null) {
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(driveUrl))
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.ContentCopy,
+                                        contentDescription = "Copy Google Drive URL",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = driveUrl != null) {
+                            driveUrl?.let { uriHandler.openUri(it) }
+                        },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
 
