@@ -15,7 +15,8 @@ interface LlmSummaryClient {
         provider: AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        prompt: String
     ): String
 
     /**
@@ -25,7 +26,8 @@ interface LlmSummaryClient {
         provider: AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        prompt: String
     )
 
     /**

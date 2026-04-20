@@ -80,7 +80,8 @@ class DailySummaryWorker(
                 provider = settings.aiProvider,
                 baseUrl = settings.aiBaseUrl,
                 apiKey = settings.aiApiKey,
-                model = settings.aiModel
+                model = settings.aiModel,
+                prompt = settings.customPrompt
             )
             dailySummaryRepository.saveSummaryForDay(targetDayKey, markdown)
             operationLogRepository.appendLog(

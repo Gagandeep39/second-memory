@@ -184,7 +184,8 @@ fun DailyViewScreen(
                 provider = settings.aiProvider,
                 baseUrl = settings.aiBaseUrl,
                 apiKey = settings.aiApiKey,
-                model = settings.aiModel
+                model = settings.aiModel,
+                prompt = settings.customPrompt
             )
         }.onSuccess { markdown ->
             runCatching {

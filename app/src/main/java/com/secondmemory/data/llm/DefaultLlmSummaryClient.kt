@@ -28,14 +28,15 @@ class DefaultLlmSummaryClient(
         provider: AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        prompt: String
     ): String = withContext(Dispatchers.IO) {
         if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
             throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
         }
 
-        val prompt = buildPrompt(dayKey = dayKey, rawJson = rawJson)
-        val requestBody = buildRequestBody(provider, model, prompt)
+        val fullPrompt = buildPrompt(dayKey = dayKey, rawJson = rawJson, systemPrompt = prompt)
+        val requestBody = buildRequestBody(provider, model, fullPrompt)
 
         val url = when (provider) {
             AIProvider.GEMINI -> "$baseUrl/models/$model:generateContent?key=$apiKey"
@@ -79,14 +80,15 @@ class DefaultLlmSummaryClient(
         provider: AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        prompt: String
     ) = withContext(Dispatchers.IO) {
         if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
             throw IllegalStateException("API key is required for ${provider.displayName}.")
         }
 
-        val prompt = "Reply with the single word OK."
-        val requestBody = buildRequestBody(provider, model, prompt)
+        val testPrompt = "Reply with the single word OK."
+        val requestBody = buildRequestBody(provider, model, testPrompt)
 
         val url = when (provider) {
             AIProvider.GEMINI -> "$baseUrl/models/$model:generateContent?key=$apiKey"
@@ -244,43 +246,11 @@ class DefaultLlmSummaryClient(
      */
 
     /**
-     * The base system prompt template used for daily summarization.
-     */
-    var prompt = """
-        You are generating a structured daily journal summary from raw thought logs. 
-
-        Input: JSON containing timestamped thoughts captured throughout a single day. 
-
-        Instructions: 
-        - Return valid markdown only. 
-        - Be concise but meaningful. Target ~150–300 words total. 
-        - Remove noise, repetition, and low-value thoughts. 
-        - Infer intent where needed, but do not hallucinate new events. 
-        - Merge similar thoughts into a single idea. 
-        - Preserve chronological flow where helpful. 
-
-        Output format: 
-
-        ## Summary of the day 
-        Write a clear, narrative-style summary of the day as a cohesive story. Focus on key activities, themes, and mindset. 
-
-        ## Achievements 
-        List concrete things completed or meaningful progress made. 
-        - Use bullet points 
-        - Only include items with clear completion or progress 
-
-        ## Things to do 
-        List actionable follow-ups or pending tasks inferred from the thoughts. 
-        - Keep each item short and specific 
-        - No more than 10 items
-    """.trimIndent()
-
-    /**
      * Combines the system prompt with the specific day's data into a final prompt string.
      */
-    private fun buildPrompt(dayKey: String, rawJson: String): String {
+    private fun buildPrompt(dayKey: String, rawJson: String, systemPrompt: String): String {
         return """
-            $prompt
+            $systemPrompt
             Day Key: $dayKey
 
             Raw JSON:

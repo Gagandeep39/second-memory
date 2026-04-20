@@ -12,6 +12,7 @@ data class AppSettings(
     val aiBaseUrl: String,
     val aiApiKey: String,
     val aiModel: String,
+    val customPrompt: String,
     val syncState: SyncState,
     val lastSyncAtMillis: Long?,
     val lastSyncMessage: String?,

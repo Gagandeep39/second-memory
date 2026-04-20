@@ -62,6 +62,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -102,6 +104,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.TextField
 import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncState
@@ -134,6 +137,7 @@ fun SettingsScreen(
             aiBaseUrl = AIProvider.GEMINI.defaultBaseUrl,
             aiApiKey = "",
             aiModel = "gemini-1.5-flash-latest",
+            customPrompt = "",
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
             lastSyncMessage = null,
@@ -143,6 +147,7 @@ fun SettingsScreen(
     var aiBaseUrl by remember(settings.aiBaseUrl) { mutableStateOf(settings.aiBaseUrl) }
     var aiApiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
     var aiModel by remember(settings.aiModel) { mutableStateOf(settings.aiModel) }
+    var customPrompt by remember(settings.customPrompt) { mutableStateOf(settings.customPrompt) }
     var aiApiKeyVisible by remember { mutableStateOf(false) }
 
     var aiStatusMessage by remember { mutableStateOf<String?>(null) }
@@ -566,15 +571,15 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 scope.launch {
-                                    settingsRepository.setAiConfig(aiProvider, aiBaseUrl, aiApiKey, aiModel)
+                                    settingsRepository.setAiConfig(aiProvider, aiBaseUrl, aiApiKey, aiModel, customPrompt)
                                     DataStoreOperationLogRepository(context).appendLog(
                                         category = "CONFIG",
-                                        action = "AI Configuration updated",
+                                        action = "AI Provider Configuration updated",
                                         status = "SUCCESS",
                                         details = "Provider: ${aiProvider.displayName}, Model: $aiModel",
                                         source = "SettingsScreen"
                                     )
-                                    aiStatusMessage = "AI configuration saved."
+                                    aiStatusMessage = "AI provider saved."
                                 }
                             },
                         ) {
@@ -588,7 +593,7 @@ fun SettingsScreen(
                                 scope.launch {
                                     aiStatusMessage = "Testing connection..."
                                     runCatching {
-                                        llmSummaryClient.testConnection(aiProvider, aiBaseUrl, aiApiKey, aiModel)
+                                        llmSummaryClient.testConnection(aiProvider, aiBaseUrl, aiApiKey, aiModel, customPrompt)
                                     }.onSuccess {
                                         aiStatusMessage = "Connection successful!"
                                     }.onFailure { error ->
@@ -634,6 +639,101 @@ fun SettingsScreen(
                         }
                     },
                 )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+
+                // Custom Prompt
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Daily Summarization Prompt",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+
+                    TextField(
+                        value = customPrompt,
+                        onValueChange = { customPrompt = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .height(240.dp),
+                        placeholder = { Text("Instructions for the AI...") },
+                        shape = MaterialTheme.shapes.large,
+                        minLines = 5,
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent
+                        )
+                    )
+                    Text(
+                        text = "This prompt guides the AI in generating your daily summary. Use markdown format instructions.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    var promptStatusMessage by remember { mutableStateOf<String?>(null) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                scope.launch {
+                                    settingsRepository.setAiConfig(aiProvider, aiBaseUrl, aiApiKey, aiModel, customPrompt)
+                                    DataStoreOperationLogRepository(context).appendLog(
+                                        category = "CONFIG",
+                                        action = "Custom Prompt updated",
+                                        status = "SUCCESS",
+                                        details = "Prompt length: ${customPrompt.length}",
+                                        source = "SettingsScreen"
+                                    )
+                                    promptStatusMessage = "Prompt saved."
+                                    delay(3000)
+                                    promptStatusMessage = null
+                                }
+                            },
+                        ) {
+                            Text("Save")
+                        }
+
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                customPrompt = settingsRepository.getDefaultPrompt()
+                            }
+                        ) {
+                            Text("Reset")
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = promptStatusMessage != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Text(
+                            text = promptStatusMessage ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
             }
 
             SettingsSection(

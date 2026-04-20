@@ -93,9 +93,12 @@ class DataStoreSettingsRepository(
             prefs[Keys.AI_API_KEY] = trimmed
             prefs[Keys.AI_PROVIDER] = AIProvider.GEMINI.name
             prefs[Keys.AI_BASE_URL] = AIProvider.GEMINI.defaultBaseUrl
-            // Default Gemini model if not set
+            // Default Gemini model and prompt if not set
             if ((prefs[Keys.AI_MODEL] ?: "").isBlank()) {
                 prefs[Keys.AI_MODEL] = "gemini-1.5-flash-latest"
+            }
+            if ((prefs[Keys.CUSTOM_PROMPT] ?: "").isBlank()) {
+                prefs[Keys.CUSTOM_PROMPT] = DEFAULT_PROMPT
             }
 
             if (trimmed.isBlank()) {
@@ -115,13 +118,15 @@ class DataStoreSettingsRepository(
         provider: AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        customPrompt: String
     ) {
         context.appSettingsStore.edit { prefs ->
             prefs[Keys.AI_PROVIDER] = provider.name
             prefs[Keys.AI_BASE_URL] = baseUrl.trim()
             prefs[Keys.AI_API_KEY] = apiKey.trim()
             prefs[Keys.AI_MODEL] = model.trim()
+            prefs[Keys.CUSTOM_PROMPT] = customPrompt.trim()
         }
         operationLogRepository.appendLog(
             category = "SETTINGS",
@@ -131,6 +136,8 @@ class DataStoreSettingsRepository(
             source = "DataStoreSettingsRepository",
         )
     }
+
+    override fun getDefaultPrompt(): String = DEFAULT_PROMPT
 
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return syncRepository.observeSyncMetadata()
@@ -160,6 +167,7 @@ class DataStoreSettingsRepository(
             aiBaseUrl = this[Keys.AI_BASE_URL] ?: provider.defaultBaseUrl,
             aiApiKey = aiApiKey,
             aiModel = this[Keys.AI_MODEL] ?: (if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""),
+            customPrompt = this[Keys.CUSTOM_PROMPT] ?: DEFAULT_PROMPT,
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
@@ -179,5 +187,35 @@ class DataStoreSettingsRepository(
         val AI_BASE_URL = stringPreferencesKey("ai_base_url")
         val AI_API_KEY = stringPreferencesKey("ai_api_key")
         val AI_MODEL = stringPreferencesKey("ai_model")
+        val CUSTOM_PROMPT = stringPreferencesKey("custom_prompt")
+    }
+
+    private companion object {
+        const val DEFAULT_PROMPT = """You are generating a structured daily journal summary from raw thought logs. 
+
+Input: JSON containing timestamped thoughts captured throughout a single day. 
+
+Instructions: 
+- Return valid markdown only. 
+- Be concise but meaningful. Target ~150–300 words total. 
+- Remove noise, repetition, and low-value thoughts. 
+- Infer intent where needed, but do not hallucinate new events. 
+- Merge similar thoughts into a single idea. 
+- Preserve chronological flow where helpful. 
+
+Output format: 
+
+## Summary of the day 
+Write a clear, narrative-style summary of the day as a cohesive story. Focus on key activities, themes, and mindset. 
+
+## Achievements 
+List concrete things completed or meaningful progress made. 
+- Use bullet points 
+- Only include items with clear completion or progress 
+
+## Things to do 
+List actionable follow-ups or pending tasks inferred from the thoughts. 
+- Keep each item short and specific 
+- No more than 10 items"""
     }
 }

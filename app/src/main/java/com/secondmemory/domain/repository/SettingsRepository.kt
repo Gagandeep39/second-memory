@@ -46,8 +46,14 @@ interface SettingsRepository {
         provider: com.secondmemory.domain.model.AIProvider,
         baseUrl: String,
         apiKey: String,
-        model: String
+        model: String,
+        customPrompt: String
     )
+
+    /**
+     * Returns the default summarization prompt.
+     */
+    fun getDefaultPrompt(): String
 
     /**
      * Streams the current sync metadata and subsequent updates.
