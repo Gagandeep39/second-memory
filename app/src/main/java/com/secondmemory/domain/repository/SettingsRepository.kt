@@ -34,9 +34,20 @@ interface SettingsRepository {
     suspend fun setCloudSummaryEnabled(enabled: Boolean)
 
     /**
-     * Stores a Gemini API key used for cloud summary generation.
+     * Updates AI configuration.
      */
-    suspend fun setGeminiApiKey(apiKey: String)
+    suspend fun setAiConfig(
+        provider: com.secondmemory.domain.model.AIProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        customPrompt: String
+    )
+
+    /**
+     * Returns the default summarization prompt.
+     */
+    fun getDefaultPrompt(): String
 
     /**
      * Streams the current sync metadata and subsequent updates.

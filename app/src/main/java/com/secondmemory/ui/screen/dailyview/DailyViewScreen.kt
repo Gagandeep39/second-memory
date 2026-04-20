@@ -156,12 +156,8 @@ fun DailyViewScreen(
 
     val summarizeDay: suspend (String) -> Unit = summarizeDay@{ dayKey ->
         val settings = settingsRepository.currentSettings()
-        if (settings.geminiApiKey.isBlank()) {
-            snackbarHostState.showSnackbar("Add Gemini API key in Settings before summarizing.")
-            return@summarizeDay
-        }
-        if (!settings.cloudSummaryEnabled) {
-            snackbarHostState.showSnackbar("Enable Cloud Summaries in Settings to summarize.")
+        if (settings.aiApiKey.isBlank()) {
+            snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
             return@summarizeDay
         }
 
@@ -177,7 +173,7 @@ fun DailyViewScreen(
             category = "SUMMARY",
             action = "Generate summary",
             status = "STARTED",
-            details = "dayKey=$dayKey",
+            details = "dayKey=$dayKey, provider=${settings.aiProvider}",
             source = "DailyViewScreen"
         )
 
@@ -185,7 +181,11 @@ fun DailyViewScreen(
             llmSummaryClient.summarizeDay(
                 dayKey = dayKey,
                 rawJson = rawJson,
-                apiKey = settings.geminiApiKey,
+                provider = settings.aiProvider,
+                baseUrl = settings.aiBaseUrl,
+                apiKey = settings.aiApiKey,
+                model = settings.aiModel,
+                prompt = settings.customPrompt
             )
         }.onSuccess { markdown ->
             runCatching {
@@ -344,9 +344,17 @@ fun DailyViewScreen(
             ) {
                 FloatingActionButton(
                     onClick = {
-                        datePickerSeedMillis = todayUtcStartOfDayMillis()
-                        showDatePicker = true
+                        if (activeSummarizeDay == null) {
+                            datePickerSeedMillis = todayUtcStartOfDayMillis()
+                            showDatePicker = true
+                        }
                     },
+                    containerColor = if (activeSummarizeDay != null) 
+                        MaterialTheme.colorScheme.surfaceVariant 
+                    else MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = if (activeSummarizeDay != null) 
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
+                    else MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CalendarMonth,
@@ -355,8 +363,10 @@ fun DailyViewScreen(
                 }
                 ExtendedFloatingActionButton(
                     onClick = {
-                        scope.launch {
-                            summarizeDay(dayKeyFromUtcMillis(todayUtcStartOfDayMillis()))
+                        if (activeSummarizeDay == null) {
+                            scope.launch {
+                                summarizeDay(dayKeyFromUtcMillis(todayUtcStartOfDayMillis()))
+                            }
                         }
                     },
                     text = { Text("Summarize") },
@@ -367,6 +377,12 @@ fun DailyViewScreen(
                         )
                     },
                     expanded = summarizeFabExpanded,
+                    containerColor = if (activeSummarizeDay != null) 
+                        MaterialTheme.colorScheme.surfaceVariant 
+                    else MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = if (activeSummarizeDay != null) 
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
+                    else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         },
