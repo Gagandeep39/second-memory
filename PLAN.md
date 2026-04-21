@@ -14,6 +14,7 @@ This file now tracks only remaining work. Completed phases are removed when fini
 8.  Add option to switch between speech recognition and google coloud api (Handle no internet scenario as well when using google cloud api)
 9.  Weekly view must have an option for custom prompt
 10. Create a scheduled task for weekly summariazation
+11. When clicking summarize and moving to other screen, it cancels,make it such that it will also use those work manager job instead
 
 ---
 
