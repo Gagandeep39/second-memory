@@ -293,46 +293,6 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.outlineVariant
                     )
 
-                    val folderId = settings.driveFolderId
-                    val driveUrl = folderId?.let { "https://drive.google.com/drive/folders/$it" }
-
-                    ListItem(
-                        headlineContent = { Text("View in Google Drive") },
-                        supportingContent = {
-                            Text(
-                                text = driveUrl ?: "Link will be available after the first successful sync",
-                                maxLines = if (driveUrl == null) 2 else 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        },
-                        trailingContent = {
-                            if (driveUrl != null) {
-                                IconButton(
-                                    onClick = {
-                                        clipboardManager.setText(AnnotatedString(driveUrl))
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.ContentCopy,
-                                        contentDescription = "Copy Google Drive URL",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier.clickable(enabled = driveUrl != null) {
-                            driveUrl?.let { uriHandler.openUri(it) }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-
                     ListItem(
                         headlineContent = {
                             Text(
@@ -392,6 +352,47 @@ fun SettingsScreen(
                                     Icon(Icons.Outlined.Sync, contentDescription = "Sync Now")
                                 }
                             }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    val folderId = settings.driveFolderId
+                    val driveUrl = folderId?.let { "https://drive.google.com/drive/folders/$it" }
+
+                    ListItem(
+                        headlineContent = { Text("View in Google Drive") },
+                        supportingContent = {
+                            Text(
+                                text = driveUrl ?: "Link will be available after the first successful sync",
+                                maxLines = if (driveUrl == null) 2 else 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        trailingContent = {
+                            if (driveUrl != null) {
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(driveUrl))
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.ContentCopy,
+                                        contentDescription = "Copy Google Drive URL",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = driveUrl != null) {
+                            driveUrl?.let { uriHandler.openUri(it) }
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
