@@ -494,7 +494,7 @@ fun SettingsScreen(
                                         aiBaseUrl = provider.defaultBaseUrl
                                         providerExpanded = false
                                         // Reset model when provider changes
-                                        aiModel = if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""
+                                        aiModel = ""
                                         availableModels = emptyList()
                                     }
                                 )

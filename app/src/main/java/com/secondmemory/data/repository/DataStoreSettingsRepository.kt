@@ -156,7 +156,7 @@ class DataStoreSettingsRepository(
             aiProvider = provider,
             aiBaseUrl = this[Keys.AI_BASE_URL] ?: provider.defaultBaseUrl,
             aiApiKey = aiApiKey,
-            aiModel = this[Keys.AI_MODEL] ?: (if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""),
+            aiModel = this[Keys.AI_MODEL] ?: (""),
             customPrompt = this[Keys.CUSTOM_PROMPT] ?: DEFAULT_PROMPT,
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
