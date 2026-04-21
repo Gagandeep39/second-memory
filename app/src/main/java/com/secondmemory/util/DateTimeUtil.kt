@@ -9,8 +9,10 @@ import java.time.format.DateTimeParseException
 
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val dayKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
+private val weekKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("YYYYww")
 private val displayDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
 private val displayDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")
+private val weekFields = java.time.temporal.WeekFields.of(java.time.DayOfWeek.SUNDAY, 1)
 
 /**
  * Returns today's day key in yyyymmdd format used by raw thought files.
@@ -20,11 +22,45 @@ fun todayDayKey(): String {
 }
 
 /**
+ * Returns current week key in YYYYww format, starting on Sunday.
+ */
+fun currentWeekKey(): String {
+    val now = LocalDate.now()
+    val sunday = now.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.SUNDAY))
+    return sunday.format(weekKeyFormatter)
+}
+
+/**
  * Returns a day key moved by the provided number of days.
  */
 fun shiftDayKey(dayKey: String, deltaDays: Long): String {
     val date = parseDayKey(dayKey) ?: LocalDate.now()
     return date.plusDays(deltaDays).format(dayKeyFormatter)
+}
+
+/**
+ * Returns the week key for a given day key.
+ */
+fun weekKeyFromDayKey(dayKey: String): String {
+    val date = parseDayKey(dayKey) ?: LocalDate.now()
+    val sunday = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.SUNDAY))
+    return sunday.format(weekKeyFormatter)
+}
+
+/**
+ * Returns all day keys belonging to a given week key (Sunday to Sunday, 8 days).
+ */
+fun dayKeysInWeek(weekKey: String): List<String> {
+    val year = weekKey.substring(0, 4).toInt()
+    val week = weekKey.substring(4, 6).toInt()
+    
+    val date = LocalDate.of(year, 1, 1)
+        .with(weekFields.weekOfYear(), week.toLong())
+        .with(weekFields.dayOfWeek(), 1L) // Sunday
+    
+    return (0..7).map {
+        date.plusDays(it.toLong()).format(dayKeyFormatter)
+    }
 }
 
 /**

@@ -30,6 +30,7 @@ import com.secondmemory.data.llm.DefaultLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
+import com.secondmemory.data.repository.FileWeeklySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.ui.component.AppSnackbar
@@ -66,6 +67,7 @@ fun SecondMemoryApp() {
         JsonThoughtRepository(context)
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
+    val weeklySummaryRepository = remember(context) { FileWeeklySummaryRepository(context) }
     val driveSyncClient = remember(context) { GoogleDriveSyncClient(context) }
     val syncRepository = remember(context) {
         DataStoreSyncRepository(
@@ -131,6 +133,7 @@ fun SecondMemoryApp() {
                     navController = navController,
                     thoughtRepository = thoughtRepository,
                     dailySummaryRepository = dailySummaryRepository,
+                    weeklySummaryRepository = weeklySummaryRepository,
                     settingsRepository = settingsRepository,
                     operationLogRepository = operationLogRepository,
                     llmSummaryClient = llmSummaryClient,

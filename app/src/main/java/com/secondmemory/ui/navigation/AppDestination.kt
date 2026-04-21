@@ -29,6 +29,12 @@ sealed class AppDestination(
         icon = Icons.AutoMirrored.Default.EventNote,
     )
 
+    data object WeeklyView : AppDestination(
+        route = "weekly_view",
+        label = "Weekly",
+        icon = Icons.Default.Description,
+    )
+
     data object Settings : AppDestination(
         route = "settings",
         label = "Settings",
@@ -50,9 +56,9 @@ sealed class AppDestination(
         icon = Icons.Default.GraphicEq,
     )
 
-    data object DailySummaryDetail : AppDestination(
-        route = "daily_summary_detail/{fileName}",
-        label = "Daily Summary",
+    data object SummaryDetail : AppDestination(
+        route = "summary_detail/{fileName}",
+        label = "Summary Detail",
         icon = Icons.Default.Description,
     ) {
         /**
@@ -60,7 +66,7 @@ sealed class AppDestination(
          */
         fun routeForFile(fileName: String): String {
             val encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8.toString())
-            return "daily_summary_detail/$encoded"
+            return "summary_detail/$encoded"
         }
     }
 
@@ -72,6 +78,6 @@ sealed class AppDestination(
          * with object declarations in some runtime builds.
          */
         val topLevel: List<AppDestination>
-            get() = listOf(RawThoughts, DailyView, Settings)
+            get() = listOf(RawThoughts, DailyView, WeeklyView, Settings)
     }
 }
