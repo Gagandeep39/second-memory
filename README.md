@@ -31,7 +31,7 @@ The application includes the following features:
    - Periodic Drive sync
    - Nightly summary regeneration (targets previous day)
    - Shared network constraints and exponential backoff
-- Operation log history screen (from Settings) to audit sync, work, and settings events
+- Operation log history screen (from Settings) to audit sync, work, and settings events and stores 600 log entries
 
 
 ## Architecture Overview
