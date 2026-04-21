@@ -12,7 +12,7 @@ private val dayKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yy
 private val weekKeyFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("YYYYww")
 private val displayDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
 private val displayDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")
-private val weekFields = java.time.temporal.WeekFields.of(java.time.DayOfWeek.SUNDAY, 1)
+private val weekFields = java.time.temporal.WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
 
 /**
  * Returns today's day key in yyyymmdd format used by raw thought files.
@@ -22,12 +22,12 @@ fun todayDayKey(): String {
 }
 
 /**
- * Returns current week key in YYYYww format, starting on Sunday.
+ * Returns current week key in YYYYww format, starting on Monday.
  */
 fun currentWeekKey(): String {
     val now = LocalDate.now()
-    val sunday = now.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.SUNDAY))
-    return sunday.format(weekKeyFormatter)
+    val monday = now.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    return monday.format(weekKeyFormatter)
 }
 
 /**
@@ -43,12 +43,12 @@ fun shiftDayKey(dayKey: String, deltaDays: Long): String {
  */
 fun weekKeyFromDayKey(dayKey: String): String {
     val date = parseDayKey(dayKey) ?: LocalDate.now()
-    val sunday = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.SUNDAY))
-    return sunday.format(weekKeyFormatter)
+    val monday = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    return monday.format(weekKeyFormatter)
 }
 
 /**
- * Returns all day keys belonging to a given week key (Sunday to Sunday, 8 days).
+ * Returns all day keys belonging to a given week key (Monday to Sunday, 7 days).
  */
 fun dayKeysInWeek(weekKey: String): List<String> {
     val year = weekKey.substring(0, 4).toInt()
@@ -56,15 +56,15 @@ fun dayKeysInWeek(weekKey: String): List<String> {
     
     val date = LocalDate.of(year, 1, 1)
         .with(weekFields.weekOfYear(), week.toLong())
-        .with(weekFields.dayOfWeek(), 1L) // Sunday
+        .with(weekFields.dayOfWeek(), 1L) // Monday
     
-    return (0..7).map {
+    return (0..6).map {
         date.plusDays(it.toLong()).format(dayKeyFormatter)
     }
 }
 
 /**
- * Returns the range for a given week key (Sunday to Sunday, 8 days) as a pair of LocalDates.
+ * Returns the range for a given week key (Monday to Sunday, 7 days) as a pair of LocalDates.
  */
 fun weekRangeFromKey(weekKey: String): Pair<LocalDate, LocalDate> {
     val year = weekKey.substring(0, 4).toInt()
@@ -72,9 +72,9 @@ fun weekRangeFromKey(weekKey: String): Pair<LocalDate, LocalDate> {
     
     val start = LocalDate.of(year, 1, 1)
         .with(weekFields.weekOfYear(), week.toLong())
-        .with(weekFields.dayOfWeek(), 1L) // Sunday
+        .with(weekFields.dayOfWeek(), 1L) // Monday
     
-    return start to start.plusDays(7)
+    return start to start.plusDays(6)
 }
 
 /**
