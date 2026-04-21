@@ -601,7 +601,7 @@ fun SettingsScreen(
                         }
                         Text(
                             text = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
-                                "⚠️ API key is needed to list all available models" 
+                                "API key is needed to list all available models"
                             else "Select or type the model ID (e.g. gpt-4o, gemini-1.5-pro)",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
