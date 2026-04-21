@@ -64,6 +64,20 @@ fun dayKeysInWeek(weekKey: String): List<String> {
 }
 
 /**
+ * Returns the range for a given week key (Sunday to Sunday, 8 days) as a pair of LocalDates.
+ */
+fun weekRangeFromKey(weekKey: String): Pair<LocalDate, LocalDate> {
+    val year = weekKey.substring(0, 4).toInt()
+    val week = weekKey.substring(4, 6).toInt()
+    
+    val start = LocalDate.of(year, 1, 1)
+        .with(weekFields.weekOfYear(), week.toLong())
+        .with(weekFields.dayOfWeek(), 1L) // Sunday
+    
+    return start to start.plusDays(7)
+}
+
+/**
  * Returns today's date as a UTC midnight timestamp for the date picker.
  */
 fun todayUtcStartOfDayMillis(): Long {
