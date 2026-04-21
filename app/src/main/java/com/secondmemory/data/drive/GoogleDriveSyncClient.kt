@@ -66,6 +66,7 @@ class GoogleDriveSyncClient(
 
         val rootFolderId = ensureFolder(driveService, null, ROOT_FOLDER_NAME)
         val dataFolderId = ensureFolder(driveService, rootFolderId, DATA_FOLDER_NAME)
+        val conflictsFolderId = ensureFolder(driveService, dataFolderId, CONFLICTS_FOLDER_NAME)
 
         var uploaded = 0
         var downloaded = 0
@@ -114,10 +115,8 @@ class GoogleDriveSyncClient(
                     }
                     remoteModified > localModified + TIME_SKEW_MILLIS -> {
                         // Conflict check: if remote was updated after local was last touched
-                        // AND they are different, back up local before overwriting.
-                        // However, we just set local modified to remote modified on last sync,
-                        // so this branch should only trigger if remote really changed.
-                        backupConflictedFile(localFile)
+                        // AND they are different, back up local version to Drive before overwriting.
+                        uploadConflictFile(driveService, conflictsFolderId, localFile)
                         conflicted += 1
                         downloadRemoteFile(driveService, remoteFile.id, localFile, remoteModified)
                         downloaded += 1
@@ -262,14 +261,16 @@ class GoogleDriveSyncClient(
     }
 
     /**
-     * Creates a local backup when a newer remote version overwrites local content.
+     * Uploads the local file to the Drive conflicts folder with a timestamped name.
      */
-    private fun backupConflictedFile(localFile: java.io.File) {
-        val backup = java.io.File(
-            localFile.parentFile,
-            "${localFile.nameWithoutExtension}.conflict.${System.currentTimeMillis()}.${localFile.extension}",
-        )
-        localFile.copyTo(backup, overwrite = true)
+    private fun uploadConflictFile(driveService: Drive, conflictsFolderId: String, localFile: java.io.File) {
+        val conflictName = "${localFile.nameWithoutExtension}.conflict.${System.currentTimeMillis()}.${localFile.extension}"
+        val metadata = File().apply {
+            name = conflictName
+            mimeType = localFile.mimeType()
+            parents = listOf(conflictsFolderId)
+        }
+        driveService.files().create(metadata, contentFor(localFile)).execute()
     }
 
     /**
@@ -315,6 +316,7 @@ class GoogleDriveSyncClient(
         const val APP_NAME = "SecondMemory"
         const val ROOT_FOLDER_NAME = "com.secondmemory"
         const val DATA_FOLDER_NAME = "data"
+        const val CONFLICTS_FOLDER_NAME = "conflicts"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
         const val TIME_SKEW_MILLIS = 10_000L
     }
