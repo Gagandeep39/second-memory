@@ -62,7 +62,7 @@ object BackgroundWorkScheduler {
                 category = "WORK",
                 action = "Recurring work scheduled",
                 status = "SUCCESS",
-                details = "drive=${settings.driveSyncEnabled}, dailySummary=${settings.cloudSummaryEnabled}",
+                details = "drive=${settings.driveSyncEnabled}, dailySummary=${settings.cloudSummaryEnabled}, notifications=${settings.notificationsEnabled}",
                 source = "BackgroundWorkScheduler",
             )
         }

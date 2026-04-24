@@ -16,6 +16,18 @@ import com.secondmemory.R
  */
 class NotificationHelper(private val context: Context) {
 
+    // TODO Switch to a non hacky approach later
+    private val settingsRepository: com.secondmemory.domain.repository.SettingsRepository by lazy {
+        // This is a bit of a hack to get the repository without dependency injection in this utility
+        com.secondmemory.data.repository.DataStoreSettingsRepository(
+            context,
+            com.secondmemory.data.repository.DataStoreSyncRepository(
+                context,
+                com.secondmemory.data.drive.GoogleDriveSyncClient(context)
+            )
+        )
+    }
+
     companion object {
         const val CHANNEL_SYNC_ALERTS = "sync_alerts"
         const val CHANNEL_REMINDERS = "reminders"
@@ -62,7 +74,11 @@ class NotificationHelper(private val context: Context) {
     /**
      * Shows a notification when a Google Drive sync conflict is detected.
      */
-    fun showSyncConflictNotification() {
+    suspend fun showSyncConflictNotification() {
+        if (!settingsRepository.currentSettings().notificationsEnabled) {
+            return
+        }
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }

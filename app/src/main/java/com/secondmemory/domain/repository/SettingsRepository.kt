@@ -50,6 +50,11 @@ interface SettingsRepository {
     fun getDefaultPrompt(): String
 
     /**
+     * Enables or disables app-level notification delivery.
+     */
+    suspend fun setNotificationsEnabled(enabled: Boolean)
+
+    /**
      * Streams the current sync metadata and subsequent updates.
      */
     fun observeSyncMetadata(): Flow<SyncMetadata>

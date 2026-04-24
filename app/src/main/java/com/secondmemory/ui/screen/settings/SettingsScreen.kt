@@ -1,7 +1,15 @@
 package com.secondmemory.ui.screen.settings
 
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Base64
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CustomCredential
@@ -145,7 +153,8 @@ fun SettingsScreen(
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
             lastSyncMessage = null,
-            driveFolderId = null
+            driveFolderId = null,
+            notificationsEnabled = false
         )
     )
 
@@ -438,6 +447,30 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            // --- Notifications Section ---
+            SettingsSection(
+                title = "Notifications",
+                description = "Manage alerts and system permissions",
+                icon = Icons.Outlined.Notifications,
+                expanded = expandedSections.contains("notifications"),
+                onHeaderClick = {
+                    expandedSections = if (expandedSections.contains("notifications")) {
+                        expandedSections - "notifications"
+                    } else {
+                        expandedSections + "notifications"
+                    }
+                }
+            ) {
+                NotificationSettingItem(
+                    notificationsEnabled = settings.notificationsEnabled,
+                    onToggle = { enabled ->
+                        scope.launch {
+                            settingsRepository.setNotificationsEnabled(enabled)
+                        }
+                    }
+                )
             }
 
             // --- AI Features Section ---
@@ -976,6 +1009,80 @@ private fun SettingClickableItem(
         leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+/**
+ * Composable that manages the notification toggle and associated permission logic.
+ */
+@Composable
+private fun NotificationSettingItem(
+    notificationsEnabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onToggle(true)
+        }
+    }
+
+    SettingToggleItem(
+        title = "Enable Notifications",
+        description = "Get alerts for sync conflicts and daily reminders",
+        checked = notificationsEnabled,
+        onCheckedChange = { enabled ->
+            if (enabled) {
+                val isPermissionGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    NotificationManagerCompat.from(context).areNotificationsEnabled()
+                }
+
+                if (isPermissionGranted) {
+                    onToggle(true)
+                } else {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        showPermissionDialog = true
+                    }
+                }
+            } else {
+                onToggle(false)
+            }
+        }
+    )
+
+    if (showPermissionDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text(stringResource(R.string.notification_permission_title)) },
+            text = { Text(stringResource(R.string.notification_permission_description)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text(stringResource(R.string.notification_permission_open_settings))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text(stringResource(R.string.notification_permission_cancel))
+                }
+            }
+        )
+    }
 }
 
 /**

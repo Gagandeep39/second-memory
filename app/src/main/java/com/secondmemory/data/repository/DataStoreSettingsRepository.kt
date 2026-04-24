@@ -100,6 +100,19 @@ class DataStoreSettingsRepository(
         )
     }
 
+    override suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.appSettingsStore.edit { prefs ->
+            prefs[Keys.NOTIFICATIONS_ENABLED] = enabled
+        }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "Notifications toggled",
+            status = "SUCCESS",
+            details = "enabled=$enabled",
+            source = "DataStoreSettingsRepository",
+        )
+    }
+
     override suspend fun setAiConfig(
         provider: AIProvider,
         baseUrl: String,
@@ -158,6 +171,7 @@ class DataStoreSettingsRepository(
             aiApiKey = aiApiKey,
             aiModel = this[Keys.AI_MODEL] ?: (""),
             customPrompt = this[Keys.CUSTOM_PROMPT] ?: DEFAULT_PROMPT,
+            notificationsEnabled = this[Keys.NOTIFICATIONS_ENABLED] ?: true,
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
@@ -172,6 +186,7 @@ class DataStoreSettingsRepository(
         val DRIVE_SYNC_ENABLED = booleanPreferencesKey("drive_sync_enabled")
         val CONNECTED_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("connected_google_account_email")
         val CLOUD_SUMMARY_ENABLED = booleanPreferencesKey("cloud_summary_enabled")
+        val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
 
         val AI_PROVIDER = stringPreferencesKey("ai_provider")
         val AI_BASE_URL = stringPreferencesKey("ai_base_url")

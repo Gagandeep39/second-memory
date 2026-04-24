@@ -7,4 +7,10 @@
     <string name="widget_record_thought_title">Capture a Memory</string>
     <string name="widget_record_thought_subtitle">Tap to capture instantly</string>
     <string name="widget_record_thought_description">One-tap widget to capture a memory</string>
+
+    <!-- Notifications -->
+    <string name="notification_permission_title">Notifications</string>
+    <string name="notification_permission_description">To stay updated with sync status, please enable notifications in system settings.</string>
+    <string name="notification_permission_open_settings">Open Settings</string>
+    <string name="notification_permission_cancel">Not Now</string>
 </resources>
