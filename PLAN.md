@@ -4,17 +4,16 @@ This file now tracks only remaining work. Completed phases are removed when fini
 
 ## Backlog
 
-1. Add notification when there is a conflict and ask user to review drive
-2. Conflict files must be handled in a separate directory data/conflicts and system must add a log that there was a conflict instead of creating it in the same directory where conflict happened. Andd it should only ebe on drive
-3. Remove same icons from mainn and sub setigs section
-4. Add option to download the markdown files
-5. Add notification reminders to record thoughts at a specific time of the day - 9pm for example. This can be customizable in settings. Clicking opens record thought screen
-6. Add notification at morning 9 to show summary of yesterday's thoughts. This can also be customizable in settings. Clicking opens the specific markdown file
-7.  Replace timestampMills to timestamp in json file
-8.  Add option to switch between speech recognition and google coloud api (Handle no internet scenario as well when using google cloud api)
-9.  Weekly view must have an option for custom prompt
-10. Create a scheduled task for weekly summariazation
-11. When clicking summarize and moving to other screen, it cancels,make it such that it will also use those work manager job instead
+1. Add option to download the markdown files
+2. Add notification reminders to record thoughts at a specific time of the day - 9pm for example. This can be customizable in settings. Clicking opens record thought screen
+3. Add notification at morning 9 to show summary of yesterday's thoughts. This can also be customizable in settings. Clicking opens the specific markdown file
+4.  Replace timestampMills to timestamp in json file
+5.  Add option to switch between speech recognition and google coloud api (Handle no internet scenario as well when using google cloud api)
+6.  Weekly view must have an option for custom prompt
+7.  Create a scheduled task for weekly summariazation
+8.  Revisit if Calendar FAB is needed (Calendar on top already does the job)
+9.  Revisit if Summarize button must always be there or removed after genrating summary of the day
+10. Investiate if sync factors in deleted files in drive and handles properly
 
 ---
 
