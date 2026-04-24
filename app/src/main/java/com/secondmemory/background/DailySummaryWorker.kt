@@ -40,11 +40,14 @@ class DailySummaryWorker(
     private val llmSummaryClient = DefaultLlmSummaryClient()
 
     override suspend fun doWork(): Result {
+        // KEY_DAY_KEY - Used when calling manually from the UI
+        val targetDayKey = inputData.getString(KEY_DAY_KEY) ?: previousDayKey()
+
         operationLogRepository.appendLog(
             category = "WORK",
             action = "Daily summary worker started",
             status = "STARTED",
-            details = "runAttempt=${runAttemptCount + 1}",
+            details = "dayKey=$targetDayKey, runAttempt=${runAttemptCount + 1}",
             source = "DailySummaryWorker",
         )
         ensureAppDataDirectories(applicationContext)
@@ -60,7 +63,6 @@ class DailySummaryWorker(
             return Result.retry()
         }
         val settings = settingsRepository.currentSettings()
-        val targetDayKey = previousDayKey()
         val rawJson = thoughtRepository.readRawJson(targetDayKey)
         if (rawJson.isBlank()) {
             operationLogRepository.appendLog(
@@ -122,5 +124,9 @@ class DailySummaryWorker(
         return Data.Builder()
             .putString("error", error.message ?: "Daily summary generation failed")
             .build()
+    }
+
+    companion object {
+        const val KEY_DAY_KEY = "day_key"
     }
 }
