@@ -9,21 +9,17 @@ import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
-import com.secondmemory.data.repository.JsonThoughtRepository
+import com.secondmemory.data.repository.FileWeeklySummaryRepository
 import com.secondmemory.data.drive.GoogleDriveSyncClient
-import com.secondmemory.domain.model.AIProvider
+import com.secondmemory.util.currentWeekKey
+import com.secondmemory.util.dayKeysInWeek
 import com.secondmemory.util.ensureAppDataDirectories
-import com.secondmemory.util.shiftDayKey
-import com.secondmemory.util.todayDayKey
-
 import com.secondmemory.util.hasInternetConnection
 
 /**
- * Daily worker that regenerates the previous day's summary.
- *
- * Example: if this runs at 01:15 on April 14, it targets April 13.
+ * Worker that generates a weekly summary from daily summaries.
  */
-class DailySummaryWorker(
+class WeeklySummaryWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
@@ -35,72 +31,78 @@ class DailySummaryWorker(
             driveSyncClient = GoogleDriveSyncClient(appContext),
         ),
     )
-    private val thoughtRepository = JsonThoughtRepository(appContext)
     private val dailySummaryRepository = FileDailySummaryRepository(appContext)
+    private val weeklySummaryRepository = FileWeeklySummaryRepository(appContext)
     private val llmSummaryClient = DefaultLlmSummaryClient()
 
     override suspend fun doWork(): Result {
-        // KEY_DAY_KEY - Used when calling manually from the UI
-        val targetDayKey = inputData.getString(KEY_DAY_KEY) ?: previousDayKey()
+        val targetWeekKey = inputData.getString(KEY_WEEK_KEY) ?: currentWeekKey()
 
         operationLogRepository.appendLog(
             category = "WORK",
-            action = "Daily summary worker started",
+            action = "Weekly summary worker started",
             status = "STARTED",
-            details = "dayKey=$targetDayKey, runAttempt=${runAttemptCount + 1}",
-            source = "DailySummaryWorker",
+            details = "weekKey=$targetWeekKey, runAttempt=${runAttemptCount + 1}",
+            source = "WeeklySummaryWorker",
         )
         ensureAppDataDirectories(applicationContext)
-        // Pre-check for actual internet connectivity
+
         if (!hasInternetConnection()) {
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Daily summary worker no internet",
+                action = "Weekly summary worker no internet",
                 status = "RETRY",
                 details = "No internet connectivity detected",
-                source = "DailySummaryWorker",
+                source = "WeeklySummaryWorker",
             )
             return Result.retry()
         }
+
         val settings = settingsRepository.currentSettings()
-        val rawJson = thoughtRepository.readRawJson(targetDayKey)
-        if (rawJson.isBlank()) {
+        
+        val dayKeys = dayKeysInWeek(targetWeekKey)
+        val dailySummaries = dayKeys.mapNotNull { dayKey ->
+            val content = dailySummaryRepository.readSummaryForDay(dayKey)
+            if (content.isNotBlank()) "### $dayKey\n\n$content" else null
+        }.joinToString("\n\n")
+
+        if (dailySummaries.isBlank()) {
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Daily summary worker skipped",
+                action = "Weekly summary worker skipped",
                 status = "SKIPPED",
-                details = "No raw thoughts for $targetDayKey",
-                source = "DailySummaryWorker",
+                details = "No daily summaries for week $targetWeekKey",
+                source = "WeeklySummaryWorker",
             )
             return Result.success()
         }
 
         return runCatching {
-            val markdown = llmSummaryClient.summarizeDay(
-                dayKey = targetDayKey,
-                rawJson = rawJson,
+            val markdown = llmSummaryClient.summarizeWeek(
+                weekKey = targetWeekKey,
+                dailySummaries = dailySummaries,
                 provider = settings.aiProvider,
                 baseUrl = settings.aiBaseUrl,
                 apiKey = settings.aiApiKey,
                 model = settings.aiModel,
                 prompt = settings.customPrompt
             )
-            dailySummaryRepository.saveSummaryForDay(targetDayKey, markdown)
+            weeklySummaryRepository.saveSummaryForWeek(targetWeekKey, markdown)
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Daily summary generated",
+                action = "Weekly summary generated",
                 status = "SUCCESS",
-                details = targetDayKey,
-                source = "DailySummaryWorker",
+                details = targetWeekKey,
+                source = "WeeklySummaryWorker",
             )
             Result.success()
         }.getOrElse { error ->
             operationLogRepository.appendLog(
                 category = "WORK",
-                action = "Daily summary worker failed",
+                action = "Weekly summary worker failed",
                 status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
-                details = error.message ?: "Daily summary generation failed",
-                source = "DailySummaryWorker",
+                details = error.message ?: "Weekly summary generation failed",
+                source = "WeeklySummaryWorker",
             )
             if (shouldRetryWork(error)) {
                 Result.retry()
@@ -110,23 +112,13 @@ class DailySummaryWorker(
         }
     }
 
-    /**
-     * Returns the day key for the previous local day.
-     */
-    private fun previousDayKey(): String {
-        return shiftDayKey(todayDayKey(), -1)
-    }
-
-    /**
-     * Packs a short error reason for diagnostics.
-     */
     private fun errorData(error: Throwable): Data {
         return Data.Builder()
-            .putString("error", error.message ?: "Daily summary generation failed")
+            .putString("error", error.message ?: "Weekly summary generation failed")
             .build()
     }
 
     companion object {
-        const val KEY_DAY_KEY = "day_key"
+        const val KEY_WEEK_KEY = "week_key"
     }
 }

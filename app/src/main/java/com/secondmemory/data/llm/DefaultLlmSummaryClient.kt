@@ -35,7 +35,73 @@ class DefaultLlmSummaryClient(
             throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
         }
 
-        val fullPrompt = buildPrompt(dayKey = dayKey, rawJson = rawJson, systemPrompt = prompt)
+        val fullPrompt = buildPrompt(dayKey = dayKey, content = rawJson, systemPrompt = prompt, type = "Day")
+        val requestBody = buildRequestBody(provider, model, fullPrompt)
+
+        val url = when (provider) {
+            AIProvider.GEMINI -> "$baseUrl/models/$model:generateContent?key=$apiKey"
+            AIProvider.ANTHROPIC -> "$baseUrl/messages"
+            else -> "$baseUrl/chat/completions"
+        }
+
+        val requestBuilder = Request.Builder().url(url)
+        
+        when (provider) {
+            AIProvider.GEMINI -> { /* API key in URL */ }
+            AIProvider.ANTHROPIC -> {
+                requestBuilder.addHeader("x-api-key", apiKey)
+                requestBuilder.addHeader("anthropic-version", "2023-06-01")
+            }
+            else -> {
+                requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+            }
+        }
+
+        val request = requestBuilder
+            .post(requestBody.toString().toRequestBody(JSON.toMediaType()))
+            .build()
+
+        val response = httpClient.newCall(request).execute()
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) {
+            throw IllegalStateException("${provider.displayName} API failed with ${response.code}: $body")
+        }
+
+        val text = extractText(provider, body)
+
+        if (text.isBlank()) {
+            throw IllegalStateException("${provider.displayName} API returned an empty summary.")
+        }
+
+        text.trim()
+    }
+
+    override suspend fun summarizeWeek(
+        weekKey: String,
+        dailySummaries: String,
+        provider: AIProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        prompt: String
+    ): String = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
+            throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
+        }
+
+        val weeklySystemPrompt = """
+            You are an expert personal growth coach and biographer. 
+            Below are daily summaries for a week. 
+            Your task is to create a comprehensive weekly review that:
+            1. Highlights the main themes and recurring topics of the week.
+            2. Identifies key accomplishments or milestones.
+            3. Notes emotional trends or shifts in perspective.
+            4. Synthesizes a "Lesson of the Week" or a core takeaway.
+            
+            Format the output in clear Markdown with appropriate headers.
+        """.trimIndent()
+
+        val fullPrompt = buildPrompt(dayKey = weekKey, content = dailySummaries, systemPrompt = weeklySystemPrompt, type = "Week")
         val requestBody = buildRequestBody(provider, model, fullPrompt)
 
         val url = when (provider) {
@@ -246,15 +312,15 @@ class DefaultLlmSummaryClient(
      */
 
     /**
-     * Combines the system prompt with the specific day's data into a final prompt string.
+     * Combines the system prompt with the specific day/week data into a final prompt string.
      */
-    private fun buildPrompt(dayKey: String, rawJson: String, systemPrompt: String): String {
+    private fun buildPrompt(dayKey: String, content: String, systemPrompt: String, type: String): String {
         return """
             $systemPrompt
-            Day Key: $dayKey
+            $type Key: $dayKey
 
-            Raw JSON:
-            $rawJson
+            Input Content:
+            $content
         """.trimIndent()
     }
 

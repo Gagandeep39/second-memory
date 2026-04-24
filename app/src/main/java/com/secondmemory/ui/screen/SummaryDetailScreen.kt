@@ -1,22 +1,14 @@
-package com.secondmemory.ui.screen.dailyview
+package com.secondmemory.ui.screen
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,32 +20,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.ui.component.MarkdownText
-import kotlinx.coroutines.launch
 
 /**
- * Screen that displays full markdown/plain content for a selected daily summary file.
+ * Screen that displays full markdown/plain content for a selected summary file.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DailySummaryDetailScreen(
+fun SummaryDetailScreen(
     fileName: String,
-    dailySummaryRepository: DailySummaryRepository,
+    loadContent: suspend (String) -> String,
     onBack: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     var content by remember(fileName) { mutableStateOf("") }
 
     LaunchedEffect(fileName) {
-        scope.launch {
-            content = dailySummaryRepository.readSummary(fileName)
-        }
+        content = loadContent(fileName)
     }
 
     Scaffold (

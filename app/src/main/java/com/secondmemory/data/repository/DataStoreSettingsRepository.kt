@@ -100,6 +100,19 @@ class DataStoreSettingsRepository(
         )
     }
 
+    override suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.appSettingsStore.edit { prefs ->
+            prefs[Keys.NOTIFICATIONS_ENABLED] = enabled
+        }
+        operationLogRepository.appendLog(
+            category = "SETTINGS",
+            action = "Notifications toggled",
+            status = "SUCCESS",
+            details = "enabled=$enabled",
+            source = "DataStoreSettingsRepository",
+        )
+    }
+
     override suspend fun setAiConfig(
         provider: AIProvider,
         baseUrl: String,
@@ -156,11 +169,13 @@ class DataStoreSettingsRepository(
             aiProvider = provider,
             aiBaseUrl = this[Keys.AI_BASE_URL] ?: provider.defaultBaseUrl,
             aiApiKey = aiApiKey,
-            aiModel = this[Keys.AI_MODEL] ?: (if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""),
+            aiModel = this[Keys.AI_MODEL] ?: (""),
             customPrompt = this[Keys.CUSTOM_PROMPT] ?: DEFAULT_PROMPT,
+            notificationsEnabled = this[Keys.NOTIFICATIONS_ENABLED] ?: true,
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
+            driveFolderId = syncMetadata.driveFolderId,
         )
     }
 
@@ -171,6 +186,7 @@ class DataStoreSettingsRepository(
         val DRIVE_SYNC_ENABLED = booleanPreferencesKey("drive_sync_enabled")
         val CONNECTED_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("connected_google_account_email")
         val CLOUD_SUMMARY_ENABLED = booleanPreferencesKey("cloud_summary_enabled")
+        val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
 
         val AI_PROVIDER = stringPreferencesKey("ai_provider")
         val AI_BASE_URL = stringPreferencesKey("ai_base_url")
@@ -188,9 +204,9 @@ Input: JSON containing timestamped thoughts captured throughout a single day.
 
 Instructions: 
 - Return valid markdown only. 
-- Be concise but meaningful. Target ~150–300 words total. 
-- Remove noise, repetition, and low-value thoughts. 
-- Infer intent where needed, but do not hallucinate new events. 
+- Be concise but meaningful. Infer intent where needed, but do not invent details.
+- Do not condense long stories into short summaries and do not expand short notes into longer essays.
+- Remove noise, repetition, and low-value thoughts.
 - Merge similar thoughts into a single idea. 
 - Preserve chronological flow where helpful. 
 
@@ -207,6 +223,6 @@ List concrete things completed or meaningful progress made.
 ## Things to do 
 List actionable follow-ups or pending tasks inferred from the thoughts. 
 - Keep each item short and specific 
-- No more than 10 items"""
+"""
     }
 }

@@ -24,18 +24,22 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.LaunchedEffect
 import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.data.llm.DefaultLlmSummaryClient
 import com.secondmemory.data.repository.DataStoreOperationLogRepository
 import com.secondmemory.data.repository.DataStoreSettingsRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
+import com.secondmemory.data.repository.FileWeeklySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
+import com.secondmemory.domain.repository.SyncRepository
 import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
 import com.secondmemory.ui.theme.SecondMemoryTheme
+import com.secondmemory.util.NotificationHelper
 import com.secondmemory.util.ensureAppDataDirectories
 
 /**
@@ -44,6 +48,7 @@ import com.secondmemory.util.ensureAppDataDirectories
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NotificationHelper(this).createNotificationChannels()
         BackgroundWorkScheduler.scheduleRecurringWork(this)
         enableEdgeToEdge()
         setContent {
@@ -66,6 +71,7 @@ fun SecondMemoryApp() {
         JsonThoughtRepository(context)
     }
     val dailySummaryRepository = remember(context) { FileDailySummaryRepository(context) }
+    val weeklySummaryRepository = remember(context) { FileWeeklySummaryRepository(context) }
     val driveSyncClient = remember(context) { GoogleDriveSyncClient(context) }
     val syncRepository = remember(context) {
         DataStoreSyncRepository(
@@ -86,6 +92,13 @@ fun SecondMemoryApp() {
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route
     val topLevelDestinations = AppDestination.topLevel
+
+    
+    // Block to clear values at startup if needed
+    LaunchedEffect(Unit) {
+        // Resets sync status if its in progress
+        syncRepository.resetSyncStatus()
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -131,6 +144,7 @@ fun SecondMemoryApp() {
                     navController = navController,
                     thoughtRepository = thoughtRepository,
                     dailySummaryRepository = dailySummaryRepository,
+                    weeklySummaryRepository = weeklySummaryRepository,
                     settingsRepository = settingsRepository,
                     operationLogRepository = operationLogRepository,
                     llmSummaryClient = llmSummaryClient,

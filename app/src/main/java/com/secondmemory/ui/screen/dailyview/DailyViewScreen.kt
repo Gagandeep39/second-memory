@@ -70,7 +70,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.secondmemory.background.DailySummaryWorker
 import com.secondmemory.domain.llm.LlmSummaryClient
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import com.secondmemory.domain.model.DailySummaryFile
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
@@ -103,9 +111,11 @@ fun DailyViewScreen(
     snackbarHostState: SnackbarHostState,
     onOpenSummary: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val workManager = remember { WorkManager.getInstance(context) }
     val scope = rememberCoroutineScope()
     var dayItems by remember { mutableStateOf(emptyList<DaySummaryItem>()) }
-    var activeSummarizeDay by remember { mutableStateOf<String?>(null) }
+    var activeSummarizeDays by remember { mutableStateOf(setOf<String>()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showViewDatePicker by remember { mutableStateOf(false) }
     var datePickerSeedMillis by remember { mutableStateOf(todayUtcStartOfDayMillis()) }
@@ -154,77 +164,84 @@ fun DailyViewScreen(
         }
     }
 
-    val summarizeDay: suspend (String) -> Unit = summarizeDay@{ dayKey ->
-        val settings = settingsRepository.currentSettings()
-        if (settings.aiApiKey.isBlank()) {
-            snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
-            return@summarizeDay
-        }
-
-        val rawJson = thoughtRepository.readRawJson(dayKey)
-        if (rawJson.isBlank()) {
-            snackbarHostState.showSnackbar("Raw JSON for $dayKey is empty or missing.")
-            return@summarizeDay
-        }
-
-        activeSummarizeDay = dayKey
-        
-        operationLogRepository.appendLog(
-            category = "SUMMARY",
-            action = "Generate summary",
-            status = "STARTED",
-            details = "dayKey=$dayKey, provider=${settings.aiProvider}",
-            source = "DailyViewScreen"
-        )
-
-        runCatching {
-            llmSummaryClient.summarizeDay(
-                dayKey = dayKey,
-                rawJson = rawJson,
-                provider = settings.aiProvider,
-                baseUrl = settings.aiBaseUrl,
-                apiKey = settings.aiApiKey,
-                model = settings.aiModel,
-                prompt = settings.customPrompt
-            )
-        }.onSuccess { markdown ->
-            runCatching {
-                dailySummaryRepository.saveSummaryForDay(dayKey, markdown)
-            }.onSuccess {
-                operationLogRepository.appendLog(
-                    category = "SUMMARY",
-                    action = "Generate summary",
-                    status = "SUCCESS",
-                    details = "dayKey=$dayKey",
-                    source = "DailyViewScreen"
-                )
-                activeSummarizeDay = null
-                refresh()
-                snackbarHostState.showSnackbar("Summary generated for $dayKey.")
-            }.onFailure { error ->
-                val errorMsg = error.message ?: "unknown error"
-                operationLogRepository.appendLog(
-                    category = "SUMMARY",
-                    action = "Generate summary",
-                    status = "ERROR",
-                    details = "Failed to save: $errorMsg",
-                    source = "DailyViewScreen"
-                )
-                activeSummarizeDay = null
-                snackbarHostState.showSnackbar("Failed to save summary: $errorMsg")
+    val summarizeDay: (String) -> Unit = { dayKey ->
+        scope.launch {
+            val settings = settingsRepository.currentSettings()
+            if (settings.aiApiKey.isBlank()) {
+                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                return@launch
             }
-        }.onFailure { error ->
-            val errorMsg = error.message ?: "unknown error"
+
+            val rawJson = thoughtRepository.readRawJson(dayKey)
+            if (rawJson.isBlank()) {
+                snackbarHostState.showSnackbar("Raw JSON for $dayKey is empty or missing.")
+                return@launch
+            }
+
+            activeSummarizeDays = activeSummarizeDays + dayKey
+
+            val workRequest = OneTimeWorkRequestBuilder<DailySummaryWorker>()
+                .setInputData(workDataOf(DailySummaryWorker.KEY_DAY_KEY to dayKey))
+                .addTag("summary_job")
+                .addTag("summary_$dayKey")
+                .build()
+
             operationLogRepository.appendLog(
                 category = "SUMMARY",
                 action = "Generate summary",
-                status = "ERROR",
-                details = errorMsg,
+                status = "STARTED",
+                details = "dayKey=$dayKey, provider=${settings.aiProvider}",
                 source = "DailyViewScreen"
             )
-            activeSummarizeDay = null
-            snackbarHostState.showSnackbar("Summary failed: $errorMsg")
+
+            workManager.enqueueUniqueWork(
+                "summary_$dayKey",
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+
+            snackbarHostState.showSnackbar("Summary requested for $dayKey.")
         }
+    }
+
+    // Monitor all summary jobs reactively to update UI loading states
+    LaunchedEffect(Unit) {
+        // Observe all jobs tagged with "summary_job" to track their progress
+        workManager.getWorkInfosByTagFlow("summary_job")
+            .collect { infos ->
+                val busyKeys = mutableSetOf<String>()
+                val seenKeys = mutableSetOf<String>()
+                var shouldRefresh = false
+                
+                infos.forEach { info ->
+                    // Extract the specific dayKey from tags (e.g., "summary_20240101").
+                    // Since WorkManager doesn't expose input data while running, we encode the date in a tag.
+                    val dayKeyTag = info.tags.firstOrNull { it.startsWith("summary_") && it != "summary_job" }
+                    val dayKey = dayKeyTag?.removePrefix("summary_")
+                    
+                    if (dayKey != null) {
+                        seenKeys.add(dayKey)
+                        // If the job is active, add it to the set to show loading indicators
+                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
+                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                            busyKeys.add(dayKey)
+                        } 
+                        // If a job we were actively tracking just finished successfully, trigger a list refresh
+                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeDays.contains(dayKey)) {
+                            shouldRefresh = true
+                        }
+                    }
+                }
+                
+                // Update activeSummarizeDays:
+                // 1. Include everything currently "busy" in WorkManager
+                // 2. Keep everything we just started locally that WorkManager hasn't reported on yet (optimistic UI)
+                activeSummarizeDays = busyKeys + (activeSummarizeDays - seenKeys)
+
+                if (shouldRefresh) {
+                    refresh()
+                }
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -344,15 +361,15 @@ fun DailyViewScreen(
             ) {
                 FloatingActionButton(
                     onClick = {
-                        if (activeSummarizeDay == null) {
+                        if (activeSummarizeDays.isEmpty()) {
                             datePickerSeedMillis = todayUtcStartOfDayMillis()
                             showDatePicker = true
                         }
                     },
-                    containerColor = if (activeSummarizeDay != null) 
+                    containerColor = if (activeSummarizeDays.isNotEmpty()) 
                         MaterialTheme.colorScheme.surfaceVariant 
                     else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (activeSummarizeDay != null) 
+                    contentColor = if (activeSummarizeDays.isNotEmpty()) 
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
                     else MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
@@ -363,7 +380,7 @@ fun DailyViewScreen(
                 }
                 ExtendedFloatingActionButton(
                     onClick = {
-                        if (activeSummarizeDay == null) {
+                        if (activeSummarizeDays.isEmpty()) {
                             scope.launch {
                                 summarizeDay(dayKeyFromUtcMillis(todayUtcStartOfDayMillis()))
                             }
@@ -377,10 +394,10 @@ fun DailyViewScreen(
                         )
                     },
                     expanded = summarizeFabExpanded,
-                    containerColor = if (activeSummarizeDay != null) 
+                    containerColor = if (activeSummarizeDays.isNotEmpty()) 
                         MaterialTheme.colorScheme.surfaceVariant 
                     else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (activeSummarizeDay != null) 
+                    contentColor = if (activeSummarizeDays.isNotEmpty()) 
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
                     else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -471,7 +488,7 @@ fun DailyViewScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Tap the + icon or Summarize to generate one",
+                                text = "Tap to generate a summary of your daily reflections",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
@@ -486,12 +503,10 @@ fun DailyViewScreen(
                         items(filteredItems, key = { item -> item.dayKey }) { item ->
                             DailySummaryItem(
                                 item = item,
-                                isBusy = activeSummarizeDay == item.dayKey,
+                                isBusy = activeSummarizeDays.contains(item.dayKey),
                                 onOpen = { onOpenSummary(item.fileName) },
                                 onSummarize = {
-                                    scope.launch {
-                                        summarizeDay(item.dayKey)
-                                    }
+                                    summarizeDay(item.dayKey)
                                 },
                             )
                         }
@@ -500,7 +515,7 @@ fun DailyViewScreen(
                 }
             }
             // Overlay loading indicator
-            if (activeSummarizeDay != null) {
+            if (activeSummarizeDays.isNotEmpty()) {
                 androidx.compose.material3.LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()

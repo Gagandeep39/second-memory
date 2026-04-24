@@ -20,6 +20,19 @@ interface LlmSummaryClient {
     ): String
 
     /**
+     * Produces markdown summary content for the provided week based on daily summaries.
+     */
+    suspend fun summarizeWeek(
+        weekKey: String,
+        dailySummaries: String,
+        provider: AIProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        prompt: String
+    ): String
+
+    /**
      * Verifies that the provided AI configuration can reach the service successfully.
      */
     suspend fun testConnection(

@@ -1,7 +1,15 @@
 package com.secondmemory.ui.screen.settings
 
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Base64
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CustomCredential
@@ -81,7 +89,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -136,13 +148,18 @@ fun SettingsScreen(
             aiProvider = AIProvider.GEMINI,
             aiBaseUrl = AIProvider.GEMINI.defaultBaseUrl,
             aiApiKey = "",
-            aiModel = "gemini-1.5-flash-latest",
+            aiModel = "",
             customPrompt = "",
             syncState = SyncState.IDLE,
             lastSyncAtMillis = null,
             lastSyncMessage = null,
+            driveFolderId = null,
+            notificationsEnabled = false
         )
     )
+
+    val clipboardManager = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
     var aiProvider by remember(settings.aiProvider) { mutableStateOf(settings.aiProvider) }
     var aiBaseUrl by remember(settings.aiBaseUrl) { mutableStateOf(settings.aiBaseUrl) }
     var aiApiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
@@ -150,12 +167,12 @@ fun SettingsScreen(
     var customPrompt by remember(settings.customPrompt) { mutableStateOf(settings.customPrompt) }
     var aiApiKeyVisible by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     var aiStatusMessage by remember { mutableStateOf<String?>(null) }
     var availableModels by remember { mutableStateOf(emptyList<String>()) }
     var isFetchingModels by remember { mutableStateOf(false) }
 
     val googleWebClientId = stringResource(R.string.google_web_client_id)
-    val context = LocalContext.current
     val credentialManager = CredentialManager.create(context)
     var driveStatusMessage by remember { mutableStateOf<String?>(null) }
     var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -289,7 +306,7 @@ fun SettingsScreen(
                         headlineContent = {
                             Text(
                                 text = when (settings.syncState) {
-                                    SyncState.IDLE -> "Sync Status"
+                                    SyncState.IDLE -> "Sync now"
                                     SyncState.SYNCING -> "Syncing now..."
                                     SyncState.SUCCESS -> "Sync Succeeded"
                                     SyncState.ERROR -> "Sync Failed"
@@ -348,6 +365,47 @@ fun SettingsScreen(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
 
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    val folderId = settings.driveFolderId
+                    val driveUrl = folderId?.let { "https://drive.google.com/drive/folders/$it" }
+
+                    ListItem(
+                        headlineContent = { Text("View in Google Drive") },
+                        supportingContent = {
+                            Text(
+                                text = driveUrl ?: "Link will be available after the first successful sync",
+                                maxLines = if (driveUrl == null) 2 else 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        trailingContent = {
+                            if (driveUrl != null) {
+                                IconButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(driveUrl))
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.ContentCopy,
+                                        contentDescription = "Copy Google Drive URL",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = driveUrl != null) {
+                            driveUrl?.let { uriHandler.openUri(it) }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         thickness = 0.5.dp,
@@ -389,6 +447,30 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            // --- Notifications Section ---
+            SettingsSection(
+                title = "Notifications",
+                description = "Manage alerts and system permissions",
+                icon = Icons.Outlined.Notifications,
+                expanded = expandedSections.contains("notifications"),
+                onHeaderClick = {
+                    expandedSections = if (expandedSections.contains("notifications")) {
+                        expandedSections - "notifications"
+                    } else {
+                        expandedSections + "notifications"
+                    }
+                }
+            ) {
+                NotificationSettingItem(
+                    notificationsEnabled = settings.notificationsEnabled,
+                    onToggle = { enabled ->
+                        scope.launch {
+                            settingsRepository.setNotificationsEnabled(enabled)
+                        }
+                    }
+                )
             }
 
             // --- AI Features Section ---
@@ -445,7 +527,7 @@ fun SettingsScreen(
                                         aiBaseUrl = provider.defaultBaseUrl
                                         providerExpanded = false
                                         // Reset model when provider changes
-                                        aiModel = if (provider == AIProvider.GEMINI) "gemini-1.5-flash-latest" else ""
+                                        aiModel = ""
                                         availableModels = emptyList()
                                     }
                                 )
@@ -553,7 +635,7 @@ fun SettingsScreen(
                         }
                         Text(
                             text = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
-                                "⚠️ API key is needed to list all available models" 
+                                "API key is needed to list all available models"
                             else "Select or type the model ID (e.g. gpt-4o, gemini-1.5-pro)",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
@@ -788,7 +870,7 @@ private fun AppInfoSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "Version $versionName",
+            text = "Build number $versionName",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )
@@ -927,6 +1009,80 @@ private fun SettingClickableItem(
         leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+/**
+ * Composable that manages the notification toggle and associated permission logic.
+ */
+@Composable
+private fun NotificationSettingItem(
+    notificationsEnabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onToggle(true)
+        }
+    }
+
+    SettingToggleItem(
+        title = "Enable Notifications",
+        description = "Get alerts for sync conflicts and daily reminders",
+        checked = notificationsEnabled,
+        onCheckedChange = { enabled ->
+            if (enabled) {
+                val isPermissionGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    NotificationManagerCompat.from(context).areNotificationsEnabled()
+                }
+
+                if (isPermissionGranted) {
+                    onToggle(true)
+                } else {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        showPermissionDialog = true
+                    }
+                }
+            } else {
+                onToggle(false)
+            }
+        }
+    )
+
+    if (showPermissionDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text(stringResource(R.string.notification_permission_title)) },
+            text = { Text(stringResource(R.string.notification_permission_description)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text(stringResource(R.string.notification_permission_open_settings))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text(stringResource(R.string.notification_permission_cancel))
+                }
+            }
+        )
+    }
 }
 
 /**

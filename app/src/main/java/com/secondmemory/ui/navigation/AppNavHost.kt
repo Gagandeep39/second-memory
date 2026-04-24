@@ -15,8 +15,10 @@ import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
-import com.secondmemory.ui.screen.dailyview.DailySummaryDetailScreen
+import com.secondmemory.domain.repository.WeeklySummaryRepository
+import com.secondmemory.ui.screen.SummaryDetailScreen
 import com.secondmemory.ui.screen.dailyview.DailyViewScreen
+import com.secondmemory.ui.screen.weeklyview.WeeklyViewScreen
 import com.secondmemory.ui.screen.rawthoughts.RawThoughtsScreen
 import com.secondmemory.ui.screen.settings.OperationLogsScreen
 import com.secondmemory.ui.screen.settings.SettingsScreen
@@ -31,6 +33,7 @@ fun AppNavHost(
     navController: NavHostController,
     thoughtRepository: ThoughtRepository,
     dailySummaryRepository: DailySummaryRepository,
+    weeklySummaryRepository: WeeklySummaryRepository,
     settingsRepository: SettingsRepository,
     operationLogRepository: OperationLogRepository,
     llmSummaryClient: LlmSummaryClient,
@@ -58,21 +61,38 @@ fun AppNavHost(
                 operationLogRepository = operationLogRepository,
                 llmSummaryClient = llmSummaryClient,
                 onOpenSummary = { fileName ->
-                    navController.navigate(AppDestination.DailySummaryDetail.routeForFile(fileName))
+                    navController.navigate(AppDestination.SummaryDetail.routeForFile(fileName))
+                },
+                snackbarHostState = snackbarHostState
+            )
+        }
+        composable(AppDestination.WeeklyView.route) {
+            WeeklyViewScreen(
+                weeklySummaryRepository = weeklySummaryRepository,
+                dailySummaryRepository = dailySummaryRepository,
+                settingsRepository = settingsRepository,
+                operationLogRepository = operationLogRepository,
+                llmSummaryClient = llmSummaryClient,
+                onOpenSummary = { fileName ->
+                    navController.navigate(AppDestination.SummaryDetail.routeForFile(fileName))
                 },
                 snackbarHostState = snackbarHostState
             )
         }
         composable(
-            route = AppDestination.DailySummaryDetail.route,
+            route = AppDestination.SummaryDetail.route,
             arguments = listOf(navArgument("fileName") { type = NavType.StringType }),
         ) { backStackEntry ->
             val encoded = backStackEntry.arguments?.getString("fileName").orEmpty()
             val fileName = URLDecoder.decode(encoded, StandardCharsets.UTF_8.toString())
 
-            DailySummaryDetailScreen(
+            SummaryDetailScreen(
                 fileName = fileName,
-                dailySummaryRepository = dailySummaryRepository,
+                loadContent = { name ->
+                    // Let's just try both repositories
+                    val weekly = weeklySummaryRepository.readSummary(name)
+                    if (weekly.isNotBlank()) weekly else dailySummaryRepository.readSummary(name)
+                },
                 onBack = { navController.popBackStack() },
             )
         }

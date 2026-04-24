@@ -11,6 +11,7 @@ import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.domain.model.SyncMetadata
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SyncRepository
+import com.secondmemory.util.NotificationHelper
 import com.secondmemory.util.dailyDirectory
 import com.secondmemory.util.monthlyDirectory
 import com.secondmemory.util.rawDirectory
@@ -35,6 +36,7 @@ class DataStoreSyncRepository(
     private val driveSyncClient: GoogleDriveSyncClient,
 ) : SyncRepository {
     private val operationLogRepository = DataStoreOperationLogRepository(context)
+    private val notificationHelper = NotificationHelper(context)
 
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return context.syncStore.data.map { preferences ->
@@ -88,7 +90,14 @@ class DataStoreSyncRepository(
                     prefs[Keys.STATE] = SyncState.SUCCESS.name
                     prefs[Keys.LAST_SYNC_AT] = System.currentTimeMillis()
                     prefs[Keys.LAST_MESSAGE] = message
+                    report.rootFolderId?.let { prefs[Keys.DRIVE_FOLDER_ID] = it }
                 }
+
+                // Added notification during conflicts
+                if (report.conflictedCount > 0) {
+                    notificationHelper.showSyncConflictNotification()
+                }
+
                 operationLogRepository.appendLog(
                     category = "SYNC",
                     action = "Sync completed",
@@ -113,6 +122,23 @@ class DataStoreSyncRepository(
         }
     }
 
+    override suspend fun resetSyncStatus() {
+        context.syncStore.edit { prefs ->
+            val currentState = prefs[Keys.STATE]
+            if (currentState == SyncState.SYNCING.name) {
+                prefs[Keys.STATE] = SyncState.IDLE.name
+                prefs[Keys.LAST_MESSAGE] = "Sync was interrupted and has been reset."
+                operationLogRepository.appendLog(
+                    category = "SYNC",
+                    action = "Sync state reset",
+                    status = "IDLE",
+                    details = "Stuck SYNCING state cleared on app startup",
+                    source = "DataStoreSyncRepository",
+                )
+            }
+        }
+    }
+
     /**
      * Maps preferences into sync metadata with safe defaults.
      */
@@ -125,6 +151,7 @@ class DataStoreSyncRepository(
             state = state,
             lastSyncAtMillis = this[Keys.LAST_SYNC_AT],
             lastSyncMessage = this[Keys.LAST_MESSAGE],
+            driveFolderId = this[Keys.DRIVE_FOLDER_ID],
         )
     }
 
@@ -160,5 +187,6 @@ class DataStoreSyncRepository(
         val STATE = stringPreferencesKey("sync_state")
         val LAST_SYNC_AT = longPreferencesKey("sync_last_at")
         val LAST_MESSAGE = stringPreferencesKey("sync_last_message")
+        val DRIVE_FOLDER_ID = stringPreferencesKey("sync_drive_folder_id")
     }
 }

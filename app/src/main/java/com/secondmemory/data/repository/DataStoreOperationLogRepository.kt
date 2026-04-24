@@ -113,6 +113,6 @@ class DataStoreOperationLogRepository(
     }
 
     private companion object {
-        const val MAX_ENTRIES = 300
+        const val MAX_ENTRIES = 600
     }
 }

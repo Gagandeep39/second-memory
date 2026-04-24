@@ -11,6 +11,7 @@ import com.google.api.client.http.ByteArrayContent
 import com.google.api.client.http.FileContent
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
+import com.google.api.client.util.DateTime
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
@@ -65,6 +66,7 @@ class GoogleDriveSyncClient(
 
         val rootFolderId = ensureFolder(driveService, null, ROOT_FOLDER_NAME)
         val dataFolderId = ensureFolder(driveService, rootFolderId, DATA_FOLDER_NAME)
+        val conflictsFolderId = ensureFolder(driveService, dataFolderId, CONFLICTS_FOLDER_NAME)
 
         var uploaded = 0
         var downloaded = 0
@@ -90,7 +92,13 @@ class GoogleDriveSyncClient(
 
             (remoteNames - localNames).forEach { name ->
                 val localFile = java.io.File(localDir, name)
-                downloadRemoteFile(driveService, remoteByName.getValue(name).id, localFile)
+                val remoteFile = remoteByName.getValue(name)
+                downloadRemoteFile(
+                    driveService,
+                    remoteFile.id,
+                    localFile,
+                    remoteFile.modifiedTime?.value ?: System.currentTimeMillis()
+                )
                 downloaded += 1
             }
 
@@ -106,12 +114,17 @@ class GoogleDriveSyncClient(
                         uploaded += 1
                     }
                     remoteModified > localModified + TIME_SKEW_MILLIS -> {
-                        if (localFile.exists()) {
-                            backupConflictedFile(localFile)
-                            conflicted += 1
-                        }
-                        downloadRemoteFile(driveService, remoteFile.id, localFile)
+                        // Conflict check: if remote was updated after local was last touched
+                        // AND they are different, back up local version to Drive before overwriting.
+                        uploadConflictFile(driveService, conflictsFolderId, localFile)
+                        conflicted += 1
+                        downloadRemoteFile(driveService, remoteFile.id, localFile, remoteModified)
                         downloaded += 1
+                    }
+                    else -> {
+                        // Timestamps match within skew. No-op.
+                        // Force sync timestamps just in case they are drifting within the skew
+                        localFile.setLastModified(remoteModified)
                     }
                 }
             }
@@ -122,6 +135,7 @@ class GoogleDriveSyncClient(
             downloadedCount = downloaded,
             deletedCount = deleted,
             conflictedCount = conflicted,
+            rootFolderId = rootFolderId,
         )
     }
 
@@ -180,40 +194,62 @@ class GoogleDriveSyncClient(
 
     /**
      * Creates a file record and uploads local bytes as content.
+     * Sets the remote modified time to match the local file's timestamp to prevent false conflicts.
      */
     private fun createAndUploadFile(driveService: Drive, parentFolderId: String, localFile: java.io.File) {
         val metadata = File().apply {
             name = localFile.name
             mimeType = localFile.mimeType()
             parents = listOf(parentFolderId)
+            modifiedTime = DateTime(localFile.lastModified())
         }
 
-        driveService.files().create(metadata, contentFor(localFile))
-            .setFields("id")
+        val created = driveService.files().create(metadata, contentFor(localFile))
+            .setFields("id,modifiedTime")
             .execute()
+
+        // Sync local timestamp with exact server time to be safe
+        val serverTime = created.modifiedTime?.value
+        if (serverTime != null) {
+            localFile.setLastModified(serverTime)
+        }
     }
 
     /**
      * Updates remote file contents with local file bytes.
+     * Sets the remote modified time to match the local file's timestamp.
      */
     private fun updateRemoteFileContent(driveService: Drive, remoteId: String, localFile: java.io.File) {
-        driveService.files().update(remoteId, null, contentFor(localFile))
-            .setFields("id")
-            .execute()
+        val metadata = File().apply {
+            modifiedTime = DateTime(localFile.lastModified())
+        }
+        val request = driveService.files().update(remoteId, metadata, contentFor(localFile))
+        // Use generic set to bypass potentially missing typed setter in some library versions
+        request.set("setModifiedTime", true)
+        val updated = request.setFields("id,modifiedTime").execute()
+
+        // Sync local timestamp with exact server time
+        val serverTime = updated.modifiedTime?.value
+        if (serverTime != null) {
+            localFile.setLastModified(serverTime)
+        }
     }
 
     /**
      * Downloads a remote file and writes it to local storage.
      * Sets the local file's last modified time to match the remote file's modified time to avoid false conflicts.
      */
-    private fun downloadRemoteFile(driveService: Drive, remoteId: String, localFile: java.io.File) {
+    private fun downloadRemoteFile(
+        driveService: Drive,
+        remoteId: String,
+        localFile: java.io.File,
+        remoteModified: Long
+    ) {
         val output = java.io.ByteArrayOutputStream()
-        val remoteFile = driveService.files().get(remoteId).setFields("modifiedTime").execute()
         driveService.files().get(remoteId).executeMediaAndDownloadTo(output)
         localFile.parentFile?.mkdirs()
         localFile.writeBytes(output.toByteArray())
         // Set last modified time to match remote
-        val remoteModified = remoteFile.modifiedTime?.value ?: System.currentTimeMillis()
         localFile.setLastModified(remoteModified)
     }
 
@@ -225,14 +261,16 @@ class GoogleDriveSyncClient(
     }
 
     /**
-     * Creates a local backup when a newer remote version overwrites local content.
+     * Uploads the local file to the Drive conflicts folder with a timestamped name.
      */
-    private fun backupConflictedFile(localFile: java.io.File) {
-        val backup = java.io.File(
-            localFile.parentFile,
-            "${localFile.nameWithoutExtension}.conflict.${System.currentTimeMillis()}.${localFile.extension}",
-        )
-        localFile.copyTo(backup, overwrite = true)
+    private fun uploadConflictFile(driveService: Drive, conflictsFolderId: String, localFile: java.io.File) {
+        val conflictName = "${localFile.nameWithoutExtension}.conflict.${System.currentTimeMillis()}.${localFile.extension}"
+        val metadata = File().apply {
+            name = conflictName
+            mimeType = localFile.mimeType()
+            parents = listOf(conflictsFolderId)
+        }
+        driveService.files().create(metadata, contentFor(localFile)).execute()
     }
 
     /**
@@ -278,6 +316,7 @@ class GoogleDriveSyncClient(
         const val APP_NAME = "SecondMemory"
         const val ROOT_FOLDER_NAME = "com.secondmemory"
         const val DATA_FOLDER_NAME = "data"
+        const val CONFLICTS_FOLDER_NAME = "conflicts"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
         const val TIME_SKEW_MILLIS = 10_000L
     }

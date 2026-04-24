@@ -4,34 +4,39 @@ SecondMemory is an offline-first Android app for capturing raw thoughts, then ge
 
 ## Features
 
+
 The application includes the following features:
 
-- Adaptive top-level navigation for Raw Thoughts, Daily View, Settings, and Record Thought screens
+- Adaptive top-level navigation for Raw Thoughts, Daily View, Weekly View, Settings, and Record Thought screens
 - Launcher quick action (long-press app icon) to open Record Thought directly
-- Home screen Quick Record widget for one-tap access to Record Thought
+- Home screen Quick Record widget for one-tap access to Record Thought (now includes app launch button)
 - Dedicated Record Thought activity without navigation chrome
 - Record Thought screen with Speech-to-text input, Manual editing
 - Cursor-aware speech insertion at current cursor/selection
 - Raw Thoughts browsing by date with edit and delete options (stored as daily JSON files)
-- Daily View with summary cards for each day
-- Daily summary detail screen with markdown rendering
-- Users can edit the AI summarization prompt in Settings, allowing for personalized summary instructions.
-- Easily switch between any custom, or cloud LLM endpoints in Settings.
+- Daily View and Weekly View with summary cards for each day/week
+- Daily and weekly summary detail screens with markdown rendering
+- Users can edit the AI summarization prompt in Settings, allowing for personalized summary instructions 
+- Support for multiple LLM connections, including local models
+- Easily switch between any custom, local, or cloud LLM endpoints in Settings
 - Settings screen with:
    - Google Drive sync toggle
    - Gemini API key save/test
    - Cloud summaries toggle (visible only when Gemini key exists)
    - Custom prompt editor for daily summaries
    - LLM provider/model/base URL selection
-- Gemini-powered summary generation from raw JSON via Daily View actions:
-   - Summarize for today
-   - Summarize for a selected date (via calendar)
+   - Notification toggle
+- Gemini-powered summary generation from raw JSON via Daily or Weekly View actions:
+   - Summarize for today/this week
+   - Summarize for a selected date/week (via calendar)
 - Google Drive bidirectional sync for raw, daily, weekly, and monthly data with conflict resolution
+   - Conflict files now stored in `data/conflict` on Drive only, with notification
 - Background jobs using WorkManager:
    - Periodic Drive sync
-   - Nightly summary regeneration (targets previous day)
+   - Nightly daily summary regeneration (targets previous day)
+   - Weekly summary job (Sunday 18:00, summarizes Monday–Sunday)
    - Shared network constraints and exponential backoff
-- Operation log history screen (from Settings) to audit sync, work, and settings events
+- Operation log history screen (from Settings) to audit sync, work, and settings events and stores 1000 log entries
 
 
 ## Architecture Overview
@@ -53,11 +58,13 @@ Navigation graph:
 
 Canonical storage root: `Context.filesDir/data`
 
+
 Directory structure:
 1. `data/raw` -> raw thoughts by day as `yyyymmdd.json`
 2. `data/daily` -> daily summaries as `yyyymmdd.md`
 3. `data/weekly` -> weekly summaries as `yyyymmx.md`
 4. `data/monthly` -> monthly summaries as `yyyymm.md`
+5. `data/conflict` -> conflict files (Drive only)
 
 Directory bootstrap utility:
 1. [app/src/main/java/com/secondmemory/util/AppDataPaths.kt](app/src/main/java/com/secondmemory/util/AppDataPaths.kt)
@@ -112,13 +119,14 @@ Drive sync engine:
 Sync repository integration:
 1. [app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt](app/src/main/java/com/secondmemory/data/repository/DataStoreSyncRepository.kt)
 
+
 Current sync behavior (bidirectional sync):
 1. Syncs app `data/` folders bidirectionally with Google Drive under `com.secondmemory/data`.
 2. Covers `raw`, `daily`, `weekly`, and `monthly` directories.
 3. Files only on local device are uploaded to Drive.
 4. Files only on Drive are downloaded to local device.
 5. Files on both sides use modified-time comparison with a small skew window (last-write-wins).
-6. Creates local conflict backups (named `filename.conflict.{timestamp}.ext`) when newer remote content overwrites local files.
+6. Conflict files are now stored in `data/conflict` on Drive only, and users are notified of conflicts.
 7. **Deletion safety**: Files are never deleted from either location based on the state of the other. If a file is deleted locally, it is re-downloaded from Drive on next sync. If a file is deleted on Drive, it is re-uploaded to Drive on next sync. True deletion requires explicit deletion on both the device and Drive.
 
 ## Background Jobs (WorkManager)
@@ -134,6 +142,7 @@ Workers:
 Registration point:
 1. Scheduled during app startup in [app/src/main/java/com/secondmemory/MainActivity.kt](app/src/main/java/com/secondmemory/MainActivity.kt)
 
+
 Job definitions:
 1. Periodic Drive Sync
    - Unique name: `periodic_drive_sync`
@@ -145,6 +154,10 @@ Job definitions:
    - Initial alignment: next local 01:15
    - Target day: previous local day (for example, run at 01:15 on Apr 14 targets Apr 13)
    - Regenerates summary for that previous day when raw JSON exists
+3. Weekly Summary
+   - Unique name: `weekly_summary_job`
+   - Runs every Sunday at 18:00
+   - Summarizes data from Monday to Sunday of the same week
 
 Shared WorkManager policy:
 1. Network constraint: connected network required.
@@ -152,6 +165,7 @@ Shared WorkManager policy:
 3. Retry base delay: 30 seconds.
 
 ## Screen Responsibilities
+
 
 Raw Thoughts:
 1. Date navigation (`Prev`, `Next`, `Today`).
@@ -173,9 +187,14 @@ Daily View:
 3. Trigger summarization for today via `Summarize` FAB or for a selected day via `Calendar` FAB.
 4. Collapse `Summarize` extended FAB text when the list is scrolled.
 5. Open summary detail.
-5. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt)
+6. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailyViewScreen.kt)
 
-Daily Summary Detail:
+Weekly View:
+1. List weekly summary markdown files (`data/weekly/*.md`) by week key.
+2. Trigger summarization for the current or selected week.
+3. Open weekly summary detail.
+
+Daily/Weekly Summary Detail:
 1. Render markdown content.
 2. [app/src/main/java/com/secondmemory/ui/screen/dailyview/DailySummaryDetailScreen.kt](app/src/main/java/com/secondmemory/ui/screen/dailyview/DailySummaryDetailScreen.kt)
 3. Markdown component: [app/src/main/java/com/secondmemory/ui/component/MarkdownText.kt](app/src/main/java/com/secondmemory/ui/component/MarkdownText.kt)
@@ -184,15 +203,17 @@ Settings:
 1. Sync toggle.
 2. Gemini key save/test.
 3. Conditional cloud summary toggle.
-4. Operation logs entry point and screen.
-5. [app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt)
-6. [app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt)
+4. Notification toggle.
+5. Operation logs entry point and screen.
+6. [app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/SettingsScreen.kt)
+7. [app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt](app/src/main/java/com/secondmemory/ui/screen/settings/OperationLogsScreen.kt)
 
 ## Permissions
 
 Declared in [app/src/main/AndroidManifest.xml](app/src/main/AndroidManifest.xml):
 1. `android.permission.RECORD_AUDIO`
 2. `android.permission.INTERNET`
+3. `android.permission.POST_NOTIFICATIONS`
 
 ## Build and Run
 

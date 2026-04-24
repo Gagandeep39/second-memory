@@ -13,7 +13,9 @@ data class AppSettings(
     val aiApiKey: String,
     val aiModel: String,
     val customPrompt: String,
+    val notificationsEnabled: Boolean,
     val syncState: SyncState,
     val lastSyncAtMillis: Long?,
     val lastSyncMessage: String?,
+    val driveFolderId: String?,
 )
