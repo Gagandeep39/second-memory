@@ -1,12 +1,13 @@
 package com.secondmemory.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.EventNote
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.net.URLEncoder
@@ -20,19 +21,19 @@ sealed class AppDestination(
     data object RawThoughts : AppDestination(
         route = "raw_thoughts",
         label = "Thoughts",
-        icon = Icons.Default.Description,
+        icon = Icons.Default.Psychology,
     )
 
     data object DailyView : AppDestination(
         route = "daily_view",
         label = "Daily",
-        icon = Icons.AutoMirrored.Default.EventNote,
+        icon = Icons.Default.Today,
     )
 
     data object WeeklyView : AppDestination(
         route = "weekly_view",
         label = "Weekly",
-        icon = Icons.Default.Description,
+        icon = Icons.Default.DateRange,
     )
 
     data object Settings : AppDestination(
