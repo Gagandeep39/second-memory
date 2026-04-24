@@ -122,6 +122,23 @@ class DataStoreSyncRepository(
         }
     }
 
+    override suspend fun resetSyncStatus() {
+        context.syncStore.edit { prefs ->
+            val currentState = prefs[Keys.STATE]
+            if (currentState == SyncState.SYNCING.name) {
+                prefs[Keys.STATE] = SyncState.IDLE.name
+                prefs[Keys.LAST_MESSAGE] = "Sync was interrupted and has been reset."
+                operationLogRepository.appendLog(
+                    category = "SYNC",
+                    action = "Sync state reset",
+                    status = "IDLE",
+                    details = "Stuck SYNCING state cleared on app startup",
+                    source = "DataStoreSyncRepository",
+                )
+            }
+        }
+    }
+
     /**
      * Maps preferences into sync metadata with safe defaults.
      */

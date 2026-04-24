@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.LaunchedEffect
 import com.secondmemory.background.BackgroundWorkScheduler
 import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.data.llm.DefaultLlmSummaryClient
@@ -33,6 +34,7 @@ import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.FileWeeklySummaryRepository
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.data.repository.DataStoreSyncRepository
+import com.secondmemory.domain.repository.SyncRepository
 import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
@@ -90,6 +92,13 @@ fun SecondMemoryApp() {
     val backStackEntry = navController.currentBackStackEntryAsState().value
     val currentRoute = backStackEntry?.destination?.route
     val topLevelDestinations = AppDestination.topLevel
+
+    
+    // Block to clear values at startup if needed
+    LaunchedEffect(Unit) {
+        // Resets sync status if its in progress
+        syncRepository.resetSyncStatus()
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {

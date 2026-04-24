@@ -21,4 +21,9 @@ interface SyncRepository {
      * Starts a manual sync operation.
      */
     suspend fun syncNow(driveSyncEnabled: Boolean, accountEmail: String?)
+
+    /**
+     * Resets the sync state to IDLE if it was left in SYNCING (e.g. after a crash).
+     */
+    suspend fun resetSyncStatus()
 }
