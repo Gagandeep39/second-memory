@@ -23,7 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.secondmemory.background.WeeklySummaryWorker
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
@@ -51,9 +57,11 @@ fun WeeklyViewScreen(
     snackbarHostState: SnackbarHostState,
     onOpenSummary: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val workManager = remember { WorkManager.getInstance(context) }
     val scope = rememberCoroutineScope()
     var weeklyItems by remember { mutableStateOf(emptyList<WeeklySummaryItem>()) }
-    var activeSummarizeWeek by remember { mutableStateOf<String?>(null) }
+    var activeSummarizeWeeks by remember { mutableStateOf(setOf<String>()) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
     
@@ -98,60 +106,86 @@ fun WeeklyViewScreen(
         }
     }
 
-    val summarizeWeek: suspend (String) -> Unit = summarizeWeek@{ weekKey ->
-        val settings = settingsRepository.currentSettings()
-        if (settings.aiApiKey.isBlank()) {
-            snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
-            return@summarizeWeek
-        }
+    val summarizeWeek: (String) -> Unit = { weekKey ->
+        scope.launch {
+            val settings = settingsRepository.currentSettings()
+            if (settings.aiApiKey.isBlank()) {
+                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                return@launch
+            }
 
-        val dayKeys = dayKeysInWeek(weekKey)
-        val dailySummaries = dayKeys.mapNotNull { dayKey ->
-            val content = dailySummaryRepository.readSummaryForDay(dayKey)
-            if (content.isNotBlank()) "### $dayKey\n\n$content" else null
-        }.joinToString("\n\n")
+            val dayKeys = dayKeysInWeek(weekKey)
+            val dailySummaries = dayKeys.mapNotNull { dayKey ->
+                val content = dailySummaryRepository.readSummaryForDay(dayKey)
+                if (content.isNotBlank()) "### $dayKey\n\n$content" else null
+            }.joinToString("\n\n")
 
-        if (dailySummaries.isBlank()) {
-            snackbarHostState.showSnackbar("No daily summaries found for week $weekKey.")
-            return@summarizeWeek
-        }
+            if (dailySummaries.isBlank()) {
+                snackbarHostState.showSnackbar("No daily summaries found for week $weekKey.")
+                return@launch
+            }
 
-        activeSummarizeWeek = weekKey
-        
-        operationLogRepository.appendLog(
-            category = "SUMMARY",
-            action = "Generate weekly summary",
-            status = "STARTED",
-            details = "weekKey=$weekKey",
-            source = "WeeklyViewScreen"
-        )
+            activeSummarizeWeeks = activeSummarizeWeeks + weekKey
 
-        runCatching {
-            llmSummaryClient.summarizeWeek(
-                weekKey = weekKey,
-                dailySummaries = dailySummaries,
-                provider = settings.aiProvider,
-                baseUrl = settings.aiBaseUrl,
-                apiKey = settings.aiApiKey,
-                model = settings.aiModel,
-                prompt = settings.customPrompt
-            )
-        }.onSuccess { markdown ->
-            weeklySummaryRepository.saveSummaryForWeek(weekKey, markdown)
+            val workRequest = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
+                .setInputData(workDataOf(WeeklySummaryWorker.KEY_WEEK_KEY to weekKey))
+                .addTag("summary_job")
+                .addTag("summary_$weekKey")
+                .build()
+
             operationLogRepository.appendLog(
                 category = "SUMMARY",
                 action = "Generate weekly summary",
-                status = "SUCCESS",
-                details = "weekKey=$weekKey",
+                status = "STARTED",
+                details = "weekKey=$weekKey, provider=${settings.aiProvider}",
                 source = "WeeklyViewScreen"
             )
-            activeSummarizeWeek = null
-            refresh()
-            snackbarHostState.showSnackbar("Weekly summary generated.")
-        }.onFailure { error ->
-            activeSummarizeWeek = null
-            snackbarHostState.showSnackbar("Summary failed: ${error.message}")
+
+            workManager.enqueueUniqueWork(
+                "summary_$weekKey",
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+
+            snackbarHostState.showSnackbar("Weekly summary requested for $weekKey.")
         }
+    }
+
+    // Monitor all summary jobs reactively to update UI loading states
+    LaunchedEffect(Unit) {
+        // Observe all jobs tagged with "summary_job" to track their progress
+        workManager.getWorkInfosByTagFlow("summary_job")
+            .collect { infos ->
+                val busyKeys = mutableSetOf<String>()
+                val seenKeys = mutableSetOf<String>()
+                var shouldRefresh = false
+                
+                infos.forEach { info ->
+                    // Extract the specific weekKey from tags (e.g., "summary_2024-W10").
+                    val weekKeyTag = info.tags.firstOrNull { it.startsWith("summary_") && it != "summary_job" }
+                    val weekKey = weekKeyTag?.removePrefix("summary_")
+                    
+                    if (weekKey != null) {
+                        seenKeys.add(weekKey)
+                        // If the job is active, add it to the set to show loading indicators
+                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
+                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                            busyKeys.add(weekKey)
+                        } 
+                        // If a job we were actively tracking just finished successfully, trigger a list refresh
+                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeWeeks.contains(weekKey)) {
+                            shouldRefresh = true
+                        }
+                    }
+                }
+                
+                // Update activeSummarizeWeeks with optimistic UI logic
+                activeSummarizeWeeks = busyKeys + (activeSummarizeWeeks - seenKeys)
+                
+                if (shouldRefresh) {
+                    refresh()
+                }
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -272,8 +306,9 @@ fun WeeklyViewScreen(
                 }
                 ExtendedFloatingActionButton(
                     onClick = {
-                        if (activeSummarizeWeek == null) {
-                            scope.launch { summarizeWeek(currentWeekKey()) }
+                        val currentWeek = currentWeekKey()
+                        if (!activeSummarizeWeeks.contains(currentWeek)) {
+                            summarizeWeek(currentWeek)
                         }
                     },
                     text = { Text("Summarize") },
@@ -284,10 +319,10 @@ fun WeeklyViewScreen(
                         )
                     },
                     expanded = summarizeFabExpanded,
-                    containerColor = if (activeSummarizeWeek != null) 
+                    containerColor = if (activeSummarizeWeeks.isNotEmpty()) 
                         MaterialTheme.colorScheme.surfaceVariant 
                     else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (activeSummarizeWeek != null) 
+                    contentColor = if (activeSummarizeWeeks.isNotEmpty())
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
                     else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -381,9 +416,9 @@ fun WeeklyViewScreen(
                         items(filteredItems, key = { it.weekKey }) { item ->
                             WeeklySummaryCard(
                                 item = item,
-                                isBusy = activeSummarizeWeek == item.weekKey,
+                                isBusy = activeSummarizeWeeks.contains(item.weekKey),
                                 onOpen = { onOpenSummary(item.fileName) },
-                                onSummarize = { scope.launch { summarizeWeek(item.weekKey) } }
+                                onSummarize = { summarizeWeek(item.weekKey) }
                             )
                         }
                         item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -391,7 +426,7 @@ fun WeeklyViewScreen(
                 }
             }
             
-            if (activeSummarizeWeek != null) {
+            if (activeSummarizeWeeks.isNotEmpty()) {
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
