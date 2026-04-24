@@ -870,7 +870,7 @@ private fun AppInfoSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "Version $versionName",
+            text = "Build number $versionName",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )
