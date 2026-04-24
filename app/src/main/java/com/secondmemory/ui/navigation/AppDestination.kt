@@ -54,7 +54,7 @@ sealed class AppDestination(
     data object RecordThought : AppDestination(
         route = "record_thought",
         label = "Capture",
-        icon = Icons.Default.GraphicEq,
+        icon = Icons.Default.Psychology,
     )
 
     data object SummaryDetail : AppDestination(
