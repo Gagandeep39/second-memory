@@ -5,10 +5,9 @@ All notable changes to this project will be documented in this file.
 ## 8.0
 
 - Add support for multiple LLM sources and custom prompt
-- Improved empty list message
 - Improved settings page message (Remove special emoji characters)
 - Added Weekly view and job for Sunday 18:00 (Summarize data from Mon-Sun same week)
-- Conflic files now stored in `data/conflict` only on drive and shows notification
+- Conflic files now stored in data/conflict only on drive and shows notification
 - Added notification toggle in settings 
 - Added a fix to resolve infite syncing issue
 - Daily and weekly sumary job now use background worker
