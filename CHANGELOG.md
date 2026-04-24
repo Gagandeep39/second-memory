@@ -4,21 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## 8.0
 
-- Add support for multiple LLM connections (including local models)
+- Add support for multiple LLM sources
 - Improved empty list message
-- Improvised default summary prompt
-- Fixed Google drive link
+- Added support for custom prompt
 - Increased log limit
 - Improved settings page message (Remove special emoji characters)
-- Added Weekly view
-- Added a weekly job for usnday 18:00 (Summarize data from Monday of Sunday of same week)
-- Added Sync fixes
-- Conflic files now stored in `data/conflict` folder only on drive
-- Added a notification when there is a conflict
-- Added notification toogle in settings 
-- Added a fix to resolve infite syncing issue(Clears flag on startup)
+- Added Weekly view and job for Sunday 18:00 (Summarize data from Mon-Sun same week)
+- Conflic files now stored in `data/conflict` folder only on drive and shows notification
+- Added notification toggle in settings 
+- Added a fix to resolve infite syncing issue
 - Daily and weekly sumary job now use background worker
-- Improved App widget (Now has a App launch button)
+- Widget now has a App launch button
 - Fixed blank Record screen icon on homescreen
 
 ## 7.0
