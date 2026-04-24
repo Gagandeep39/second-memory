@@ -11,6 +11,7 @@ import com.secondmemory.data.repository.DataStoreSyncRepository
 import com.secondmemory.data.repository.FileDailySummaryRepository
 import com.secondmemory.data.repository.FileWeeklySummaryRepository
 import com.secondmemory.data.drive.GoogleDriveSyncClient
+import com.secondmemory.util.currentWeekKey
 import com.secondmemory.util.dayKeysInWeek
 import com.secondmemory.util.ensureAppDataDirectories
 import com.secondmemory.util.hasInternetConnection
@@ -35,7 +36,7 @@ class WeeklySummaryWorker(
     private val llmSummaryClient = DefaultLlmSummaryClient()
 
     override suspend fun doWork(): Result {
-        val targetWeekKey = inputData.getString(KEY_WEEK_KEY) ?: return Result.failure()
+        val targetWeekKey = inputData.getString(KEY_WEEK_KEY) ?: currentWeekKey()
 
         operationLogRepository.appendLog(
             category = "WORK",

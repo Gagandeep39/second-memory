@@ -54,8 +54,16 @@ object BackgroundWorkScheduler {
                     ExistingPeriodicWorkPolicy.UPDATE,
                     createDailySummaryRequest(),
                 )
+                
+                // Weekly summary job (Sunday 18:00)
+                workManager.enqueueUniquePeriodicWork(
+                    WeeklySummaryWorkJob.UNIQUE_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    createWeeklySummaryRequest(),
+                )
             } else {
                 workManager.cancelUniqueWork(DailySummaryWork.UNIQUE_NAME)
+                workManager.cancelUniqueWork(WeeklySummaryWorkJob.UNIQUE_NAME)
             }
 
             operationLogRepository.appendLog(
@@ -100,6 +108,22 @@ object BackgroundWorkScheduler {
         .build()
 
     /**
+     * Creates the weekly request that generates summaries every Sunday evening.
+     */
+    private fun createWeeklySummaryRequest() = PeriodicWorkRequestBuilder<WeeklySummaryWorker>(
+        WeeklySummaryWorkJob.REPEAT_DAYS,
+        TimeUnit.DAYS,
+    )
+        .setInitialDelay(nextWeeklyDelayMillis(), TimeUnit.MILLISECONDS)
+        .setConstraints(networkConstraint())
+        .setBackoffCriteria(
+            BackoffPolicy.EXPONENTIAL,
+            COMMON_BACKOFF_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        .build()
+
+    /**
      * Shared network requirements for all recurring background jobs.
      */
     private fun networkConstraint(): Constraints {
@@ -118,6 +142,20 @@ object BackgroundWorkScheduler {
     }
 
     /**
+     * Computes delay until the next Sunday at 18:00.
+     */
+    private fun nextWeeklyDelayMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+        var nextTrigger = now.withHour(18).withMinute(0).withSecond(0).withNano(0)
+        // Find next Sunday
+        while (nextTrigger.dayOfWeek != java.time.DayOfWeek.SUNDAY) {
+            nextTrigger = nextTrigger.plusDays(1)
+        }
+        
+        val target = if (nextTrigger.isAfter(now)) nextTrigger else nextTrigger.plusWeeks(1)
+        return Duration.between(now, target).toMillis().coerceAtLeast(0L)
+    }
+
+    /**
      * Constants that belong specifically to periodic Drive sync scheduling.
      */
     private object DriveSyncWork {
@@ -131,6 +169,14 @@ object BackgroundWorkScheduler {
     private object DailySummaryWork {
         const val UNIQUE_NAME = "nightly_daily_summary"
         const val REPEAT_HOURS = 24L
+    }
+
+    /**
+     * Constants that belong specifically to weekly summary scheduling.
+     */
+    private object WeeklySummaryWorkJob {
+        const val UNIQUE_NAME = "weekly_summary_job"
+        const val REPEAT_DAYS = 7L
     }
 
     private const val COMMON_BACKOFF_SECONDS = 30L
