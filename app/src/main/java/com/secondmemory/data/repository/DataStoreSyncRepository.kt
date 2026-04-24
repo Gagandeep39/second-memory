@@ -11,6 +11,7 @@ import com.secondmemory.data.drive.GoogleDriveSyncClient
 import com.secondmemory.domain.model.SyncMetadata
 import com.secondmemory.domain.model.SyncState
 import com.secondmemory.domain.repository.SyncRepository
+import com.secondmemory.util.NotificationHelper
 import com.secondmemory.util.dailyDirectory
 import com.secondmemory.util.monthlyDirectory
 import com.secondmemory.util.rawDirectory
@@ -35,6 +36,7 @@ class DataStoreSyncRepository(
     private val driveSyncClient: GoogleDriveSyncClient,
 ) : SyncRepository {
     private val operationLogRepository = DataStoreOperationLogRepository(context)
+    private val notificationHelper = NotificationHelper(context)
 
     override fun observeSyncMetadata(): Flow<SyncMetadata> {
         return context.syncStore.data.map { preferences ->
@@ -90,6 +92,12 @@ class DataStoreSyncRepository(
                     prefs[Keys.LAST_MESSAGE] = message
                     report.rootFolderId?.let { prefs[Keys.DRIVE_FOLDER_ID] = it }
                 }
+
+                // Added notification during conflicts
+                if (report.conflictedCount > 0) {
+                    notificationHelper.showSyncConflictNotification()
+                }
+
                 operationLogRepository.appendLog(
                     category = "SYNC",
                     action = "Sync completed",

@@ -37,6 +37,7 @@ import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.ui.navigation.AppDestination
 import com.secondmemory.ui.navigation.AppNavHost
 import com.secondmemory.ui.theme.SecondMemoryTheme
+import com.secondmemory.util.NotificationHelper
 import com.secondmemory.util.ensureAppDataDirectories
 
 /**
@@ -45,6 +46,7 @@ import com.secondmemory.util.ensureAppDataDirectories
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NotificationHelper(this).createNotificationChannels()
         BackgroundWorkScheduler.scheduleRecurringWork(this)
         enableEdgeToEdge()
         setContent {
