@@ -4,48 +4,100 @@
     android:layout_height="match_parent"
     android:padding="4dp">
 
-    <RelativeLayout
+    <LinearLayout
         android:id="@+id/widget_record_thought_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/widget_record_thought_bg">
+        android:background="@drawable/widget_record_thought_bg"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
+            android:id="@+id/widget_record_thought_action"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:gravity="center"
-            android:orientation="horizontal"
-            >
-
-            <ImageView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_widget_visualizer"
-                android:layout_marginStart="-12dp" />
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:orientation="horizontal">
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <TextView
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_widget_visualizer" />
+
+                <LinearLayout
+                    android:id="@+id/widget_text_container"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/widget_record_thought_title"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:layout_marginStart="8dp"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/widget_record_thought_subtitle"
-                    android:textColor="#D6E5F6"
-                    android:textSize="12sp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/widget_record_thought_title"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_record_thought_subtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/widget_record_thought_subtitle"
+                        android:textColor="#D6E5F6"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
-    </RelativeLayout>
+
+        <ImageView
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:contentDescription="@null"
+            android:src="@android:color/transparent"
+            android:background="#4E729B" />
+
+        <LinearLayout
+            android:id="@+id/widget_launch_app_expanded"
+            android:layout_width="80dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:visibility="visible">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_home"
+                android:alpha="0.8" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_launch_app_compact"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_home"
+                android:alpha="0.8" />
+        </LinearLayout>
+    </LinearLayout>
 </FrameLayout>
