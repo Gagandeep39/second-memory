@@ -171,7 +171,7 @@ class DataStoreSettingsRepository(
             aiApiKey = aiApiKey,
             aiModel = this[Keys.AI_MODEL] ?: (""),
             customPrompt = this[Keys.CUSTOM_PROMPT] ?: DEFAULT_PROMPT,
-            notificationsEnabled = this[Keys.NOTIFICATIONS_ENABLED] ?: true,
+            notificationsEnabled = this[Keys.NOTIFICATIONS_ENABLED] ?: false,
             syncState = syncMetadata.state,
             lastSyncAtMillis = syncMetadata.lastSyncAtMillis,
             lastSyncMessage = syncMetadata.lastSyncMessage,
