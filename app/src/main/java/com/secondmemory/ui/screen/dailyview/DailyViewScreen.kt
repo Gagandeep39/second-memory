@@ -87,6 +87,7 @@ import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AppSnackbar
+import com.secondmemory.ui.component.showSnackbarImmediate
 import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatDateTime
 import com.secondmemory.util.todayDayKey
@@ -124,7 +125,6 @@ fun DailyViewScreen(
     var selectedWeekStart by remember {
         mutableStateOf(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)))
     }
-
     val listState = rememberLazyListState()
     val summarizeFabExpanded by remember {
         derivedStateOf {
@@ -170,13 +170,13 @@ fun DailyViewScreen(
         scope.launch {
             val settings = settingsRepository.currentSettings()
             if (settings.aiApiKey.isBlank()) {
-                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                snackbarHostState.showSnackbarImmediate("Configure AI settings before summarizing.")
                 return@launch
             }
 
             val rawJson = thoughtRepository.readRawJson(dayKey)
             if (rawJson.isBlank()) {
-                snackbarHostState.showSnackbar("Raw JSON for $dayKey is empty or missing.")
+                snackbarHostState.showSnackbarImmediate("Raw JSON for $dayKey is empty or missing.")
                 return@launch
             }
 
@@ -202,7 +202,7 @@ fun DailyViewScreen(
                 workRequest
             )
 
-            snackbarHostState.showSnackbar("Summary requested for $dayKey.")
+            snackbarHostState.showSnackbarImmediate("Summary requested for $dayKey.")
         }
     }
 
@@ -233,14 +233,14 @@ fun DailyViewScreen(
                             when (info.state) {
                                 WorkInfo.State.SUCCEEDED -> {
                                     shouldRefresh = true
-                                    scope.launch { snackbarHostState.showSnackbar("Summary generated for $dayKey") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary generated for $dayKey") }
                                 }
                                 WorkInfo.State.FAILED -> {
                                     val error = info.outputData.getString("error") ?: "Unknown error"
-                                    scope.launch { snackbarHostState.showSnackbar("Failed for $dayKey: $error") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Failed for $dayKey: $error") }
                                 }
                                 WorkInfo.State.CANCELLED -> {
-                                    scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $dayKey") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary cancelled for $dayKey") }
                                 }
                                 else -> {}
                             }

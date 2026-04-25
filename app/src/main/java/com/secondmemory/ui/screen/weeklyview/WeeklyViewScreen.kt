@@ -37,6 +37,7 @@ import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.WeeklySummaryRepository
 import com.secondmemory.util.*
+import com.secondmemory.ui.component.showSnackbarImmediate
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -111,7 +112,7 @@ fun WeeklyViewScreen(
         scope.launch {
             val settings = settingsRepository.currentSettings()
             if (settings.aiApiKey.isBlank()) {
-                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                snackbarHostState.showSnackbarImmediate("Configure AI settings before summarizing.")
                 return@launch
             }
 
@@ -122,7 +123,7 @@ fun WeeklyViewScreen(
             }.joinToString("\n\n")
 
             if (dailySummaries.isBlank()) {
-                snackbarHostState.showSnackbar("No daily summaries found for week $weekKey.")
+                snackbarHostState.showSnackbarImmediate("No daily summaries found for week $weekKey.")
                 return@launch
             }
 
@@ -148,7 +149,7 @@ fun WeeklyViewScreen(
                 workRequest
             )
 
-            snackbarHostState.showSnackbar("Weekly summary requested for $weekKey.")
+            snackbarHostState.showSnackbarImmediate("Weekly summary requested for $weekKey.")
         }
     }
 
@@ -178,14 +179,14 @@ fun WeeklyViewScreen(
                             when (info.state) {
                                 WorkInfo.State.SUCCEEDED -> {
                                     shouldRefresh = true
-                                    scope.launch { snackbarHostState.showSnackbar("Weekly summary generated for $weekKey") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Weekly summary generated for $weekKey") }
                                 }
                                 WorkInfo.State.FAILED -> {
                                     val error = info.outputData.getString("error") ?: "Unknown error"
-                                    scope.launch { snackbarHostState.showSnackbar("Failed for $weekKey: $error") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Failed for $weekKey: $error") }
                                 }
                                 WorkInfo.State.CANCELLED -> {
-                                    scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $weekKey") }
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary cancelled for $weekKey") }
                                 }
                                 else -> {}
                             }
