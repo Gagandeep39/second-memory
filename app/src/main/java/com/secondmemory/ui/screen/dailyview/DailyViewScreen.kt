@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -44,6 +45,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -73,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.secondmemory.background.DailySummaryWorker
@@ -85,6 +88,7 @@ import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AppSnackbar
+import com.secondmemory.ui.component.showSnackbarImmediate
 import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatDateTime
 import com.secondmemory.util.todayDayKey
@@ -122,7 +126,6 @@ fun DailyViewScreen(
     var selectedWeekStart by remember {
         mutableStateOf(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)))
     }
-
     val listState = rememberLazyListState()
     val summarizeFabExpanded by remember {
         derivedStateOf {
@@ -151,13 +154,15 @@ fun DailyViewScreen(
             dayItems = summaries.map { summaryFile ->
                 val markdown = dailySummaryRepository.readSummary(summaryFile.fileName)
                 val thoughtCount = thoughtRepository.listForDay(summaryFile.dayKey).size
-                val lastUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
+                val lastSummaryUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
+                val lastThoughtUpdatedMillis = thoughtRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
                 DaySummaryItem(
                     dayKey = summaryFile.dayKey,
                     hasSummary = true,
                     thoughtCount = thoughtCount,
                     summaryWordCount = markdown.wordCount(),
-                    summaryLastUpdatedMillis = lastUpdatedMillis,
+                    summaryLastUpdatedMillis = lastSummaryUpdatedMillis,
+                    lastThoughtUpdatedMillis = lastThoughtUpdatedMillis,
                     fileName = summaryFile.fileName,
                 )
             }
@@ -168,13 +173,13 @@ fun DailyViewScreen(
         scope.launch {
             val settings = settingsRepository.currentSettings()
             if (settings.aiApiKey.isBlank()) {
-                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                snackbarHostState.showSnackbarImmediate("Configure AI settings before summarizing.")
                 return@launch
             }
 
             val rawJson = thoughtRepository.readRawJson(dayKey)
             if (rawJson.isBlank()) {
-                snackbarHostState.showSnackbar("Raw JSON for $dayKey is empty or missing.")
+                snackbarHostState.showSnackbarImmediate("Raw JSON for $dayKey is empty or missing.")
                 return@launch
             }
 
@@ -200,7 +205,7 @@ fun DailyViewScreen(
                 workRequest
             )
 
-            snackbarHostState.showSnackbar("Summary requested for $dayKey.")
+            snackbarHostState.showSnackbarImmediate("Summary requested for $dayKey.")
         }
     }
 
@@ -221,21 +226,32 @@ fun DailyViewScreen(
                     
                     if (dayKey != null) {
                         seenKeys.add(dayKey)
-                        // If the job is active, add it to the set to show loading indicators
-                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
-                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                        val isFinished = info.state.isFinished
+                        
+                        if (!isFinished) {
+                            // If the job is active, add it to the set to show loading indicators
                             busyKeys.add(dayKey)
-                        } 
-                        // If a job we were actively tracking just finished successfully, trigger a list refresh
-                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeDays.contains(dayKey)) {
-                            shouldRefresh = true
+                        } else if (activeSummarizeDays.contains(dayKey)) {
+                            // Terminal state reached. If we were tracking this key, show result feedback.
+                            when (info.state) {
+                                WorkInfo.State.SUCCEEDED -> {
+                                    shouldRefresh = true
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary generated for $dayKey") }
+                                }
+                                WorkInfo.State.FAILED -> {
+                                    val error = info.outputData.getString("error") ?: "Unknown error"
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Failed for $dayKey: $error") }
+                                }
+                                WorkInfo.State.CANCELLED -> {
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary cancelled for $dayKey") }
+                                }
+                                else -> {}
+                            }
                         }
                     }
                 }
                 
-                // Update activeSummarizeDays:
-                // 1. Include everything currently "busy" in WorkManager
-                // 2. Keep everything we just started locally that WorkManager hasn't reported on yet (optimistic UI)
+                // Update activeSummarizeDays with optimistic UI logic
                 activeSummarizeDays = busyKeys + (activeSummarizeDays - seenKeys)
 
                 if (shouldRefresh) {
@@ -516,7 +532,7 @@ fun DailyViewScreen(
             }
             // Overlay loading indicator
             if (activeSummarizeDays.isNotEmpty()) {
-                androidx.compose.material3.LinearProgressIndicator(
+                LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
@@ -560,12 +576,31 @@ private fun DailySummaryItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = dayKeyDisplayText(item.dayKey),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = dayKeyDisplayText(item.dayKey),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    if (item.needsRefresh) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                "Outdated",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -607,7 +642,8 @@ private fun DailySummaryItem(
                     Surface(
                         onClick = onSummarize,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        color = if (item.needsRefresh) MaterialTheme.colorScheme.primaryContainer 
+                                else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -615,7 +651,8 @@ private fun DailySummaryItem(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Re-summarize",
                                 modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = if (item.needsRefresh) MaterialTheme.colorScheme.onPrimaryContainer 
+                                       else MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
@@ -657,8 +694,17 @@ private data class DaySummaryItem(
     val thoughtCount: Int,
     val summaryWordCount: Int,
     val summaryLastUpdatedMillis: Long?,
+    val lastThoughtUpdatedMillis: Long?,
     val fileName: String,
-)
+) {
+    /**
+     * True if thoughts have been modified after the summary was last generated.
+     */
+    val needsRefresh: Boolean
+        get() = summaryLastUpdatedMillis != null &&
+                lastThoughtUpdatedMillis != null &&
+                lastThoughtUpdatedMillis > (summaryLastUpdatedMillis + 1000) // 1s buffer for FS precision
+}
 
 /**
  * Counts words in markdown text for quick metadata display.

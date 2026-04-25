@@ -4,9 +4,18 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import java.io.IOException
 
 /**
+ * Maximum total number of attempts (initial + retries) allowed for background jobs.
+ */
+internal const val MAX_ATTEMPTS = 3
+
+/**
  * Returns true when a background job failure looks transient and should be retried.
  */
-internal fun shouldRetryWork(error: Throwable): Boolean {
+internal fun shouldRetryWork(error: Throwable, runAttemptCount: Int): Boolean {
+    // runAttemptCount starts at 0 for the first run. 
+    // If runAttemptCount is 2, it means this is the 3rd attempt.
+    if (runAttemptCount + 1 >= MAX_ATTEMPTS) return false
+
     val root = rootCause(error)
 
     if (root is IOException) return true

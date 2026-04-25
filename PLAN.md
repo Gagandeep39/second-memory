@@ -10,10 +10,9 @@ This file now tracks only remaining work. Completed phases are removed when fini
 4.  Replace timestampMills to timestamp in json file
 5.  Add option to switch between speech recognition and google coloud api (Handle no internet scenario as well when using google cloud api)
 6.  Weekly view must have an option for custom prompt
-7.  Create a scheduled task for weekly summariazation
-8.  Revisit if Calendar FAB is needed (Calendar on top already does the job)
-9.  Revisit if Summarize button must always be there or removed after genrating summary of the day
-10. Investiate if sync factors in deleted files in drive and handles properly
+7.  Revisit if Calendar FAB is needed (Calendar on top already does the job)
+8.  Revisit if Summarize button must always be there or removed after genrating summary of the day
+9.  Investiate if sync factors in deleted files in drive and handles properly
 
 ---
 

@@ -47,17 +47,6 @@ class WeeklySummaryWorker(
         )
         ensureAppDataDirectories(applicationContext)
 
-        if (!hasInternetConnection()) {
-            operationLogRepository.appendLog(
-                category = "WORK",
-                action = "Weekly summary worker no internet",
-                status = "RETRY",
-                details = "No internet connectivity detected",
-                source = "WeeklySummaryWorker",
-            )
-            return Result.retry()
-        }
-
         val settings = settingsRepository.currentSettings()
         
         val dayKeys = dayKeysInWeek(targetWeekKey)
@@ -78,6 +67,9 @@ class WeeklySummaryWorker(
         }
 
         return runCatching {
+            if (!hasInternetConnection()) {
+                throw java.io.IOException("No internet connectivity detected")
+            }
             val markdown = llmSummaryClient.summarizeWeek(
                 weekKey = targetWeekKey,
                 dailySummaries = dailySummaries,
@@ -97,14 +89,16 @@ class WeeklySummaryWorker(
             )
             Result.success()
         }.getOrElse { error ->
+            val retry = shouldRetryWork(error, runAttemptCount)
+            val errorMessage = error.message ?: "Weekly summary generation failed"
             operationLogRepository.appendLog(
                 category = "WORK",
                 action = "Weekly summary worker failed",
-                status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
-                details = error.message ?: "Weekly summary generation failed",
+                status = if (retry) "RETRY" else "ERROR",
+                details = "$errorMessage (attempt ${runAttemptCount + 1})",
                 source = "WeeklySummaryWorker",
             )
-            if (shouldRetryWork(error)) {
+            if (retry) {
                 Result.retry()
             } else {
                 Result.failure(errorData(error))

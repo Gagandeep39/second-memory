@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.secondmemory.background.WeeklySummaryWorker
@@ -36,6 +37,7 @@ import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.WeeklySummaryRepository
 import com.secondmemory.util.*
+import com.secondmemory.ui.component.showSnackbarImmediate
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -110,7 +112,7 @@ fun WeeklyViewScreen(
         scope.launch {
             val settings = settingsRepository.currentSettings()
             if (settings.aiApiKey.isBlank()) {
-                snackbarHostState.showSnackbar("Configure AI settings before summarizing.")
+                snackbarHostState.showSnackbarImmediate("Configure AI settings before summarizing.")
                 return@launch
             }
 
@@ -121,7 +123,7 @@ fun WeeklyViewScreen(
             }.joinToString("\n\n")
 
             if (dailySummaries.isBlank()) {
-                snackbarHostState.showSnackbar("No daily summaries found for week $weekKey.")
+                snackbarHostState.showSnackbarImmediate("No daily summaries found for week $weekKey.")
                 return@launch
             }
 
@@ -147,7 +149,7 @@ fun WeeklyViewScreen(
                 workRequest
             )
 
-            snackbarHostState.showSnackbar("Weekly summary requested for $weekKey.")
+            snackbarHostState.showSnackbarImmediate("Weekly summary requested for $weekKey.")
         }
     }
 
@@ -167,14 +169,27 @@ fun WeeklyViewScreen(
                     
                     if (weekKey != null) {
                         seenKeys.add(weekKey)
-                        // If the job is active, add it to the set to show loading indicators
-                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
-                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                        val isFinished = info.state.isFinished
+                        
+                        if (!isFinished) {
+                            // If the job is active, add it to the set to show loading indicators
                             busyKeys.add(weekKey)
-                        } 
-                        // If a job we were actively tracking just finished successfully, trigger a list refresh
-                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeWeeks.contains(weekKey)) {
-                            shouldRefresh = true
+                        } else if (activeSummarizeWeeks.contains(weekKey)) {
+                            // Terminal state reached. If we were tracking this key, show result feedback.
+                            when (info.state) {
+                                WorkInfo.State.SUCCEEDED -> {
+                                    shouldRefresh = true
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Weekly summary generated for $weekKey") }
+                                }
+                                WorkInfo.State.FAILED -> {
+                                    val error = info.outputData.getString("error") ?: "Unknown error"
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Failed for $weekKey: $error") }
+                                }
+                                WorkInfo.State.CANCELLED -> {
+                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary cancelled for $weekKey") }
+                                }
+                                else -> {}
+                            }
                         }
                     }
                 }

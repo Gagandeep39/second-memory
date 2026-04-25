@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -89,4 +90,12 @@ fun AppSnackbar(
             )
         }
     }
+}
+
+/**
+ * Shows a snackbar immediately, dismissing any current one first to avoid queuing.
+ */
+suspend fun SnackbarHostState.showSnackbarImmediate(message: String) {
+    currentSnackbarData?.dismiss()
+    showSnackbar(message)
 }

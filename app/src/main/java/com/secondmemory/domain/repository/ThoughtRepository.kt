@@ -30,4 +30,9 @@ interface ThoughtRepository {
      * Removes a thought by id from the provided day collection.
      */
     suspend fun deleteThought(dayKey: String, thoughtId: String)
+
+    /**
+     * Returns last modified epoch millis for a day thoughts file, or null if missing.
+     */
+    suspend fun lastUpdatedMillisForDay(dayKey: String): Long?
 }
