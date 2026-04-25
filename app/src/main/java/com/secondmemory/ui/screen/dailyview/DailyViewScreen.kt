@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -153,13 +154,15 @@ fun DailyViewScreen(
             dayItems = summaries.map { summaryFile ->
                 val markdown = dailySummaryRepository.readSummary(summaryFile.fileName)
                 val thoughtCount = thoughtRepository.listForDay(summaryFile.dayKey).size
-                val lastUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
+                val lastSummaryUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
+                val lastThoughtUpdatedMillis = thoughtRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
                 DaySummaryItem(
                     dayKey = summaryFile.dayKey,
                     hasSummary = true,
                     thoughtCount = thoughtCount,
                     summaryWordCount = markdown.wordCount(),
-                    summaryLastUpdatedMillis = lastUpdatedMillis,
+                    summaryLastUpdatedMillis = lastSummaryUpdatedMillis,
+                    lastThoughtUpdatedMillis = lastThoughtUpdatedMillis,
                     fileName = summaryFile.fileName,
                 )
             }
@@ -573,12 +576,31 @@ private fun DailySummaryItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = dayKeyDisplayText(item.dayKey),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = dayKeyDisplayText(item.dayKey),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    if (item.needsRefresh) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                "Outdated",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -620,7 +642,8 @@ private fun DailySummaryItem(
                     Surface(
                         onClick = onSummarize,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        color = if (item.needsRefresh) MaterialTheme.colorScheme.primaryContainer 
+                                else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -628,7 +651,8 @@ private fun DailySummaryItem(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Re-summarize",
                                 modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = if (item.needsRefresh) MaterialTheme.colorScheme.onPrimaryContainer 
+                                       else MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
@@ -670,8 +694,17 @@ private data class DaySummaryItem(
     val thoughtCount: Int,
     val summaryWordCount: Int,
     val summaryLastUpdatedMillis: Long?,
+    val lastThoughtUpdatedMillis: Long?,
     val fileName: String,
-)
+) {
+    /**
+     * True if thoughts have been modified after the summary was last generated.
+     */
+    val needsRefresh: Boolean
+        get() = summaryLastUpdatedMillis != null &&
+                lastThoughtUpdatedMillis != null &&
+                lastThoughtUpdatedMillis > (summaryLastUpdatedMillis + 1000) // 1s buffer for FS precision
+}
 
 /**
  * Counts words in markdown text for quick metadata display.

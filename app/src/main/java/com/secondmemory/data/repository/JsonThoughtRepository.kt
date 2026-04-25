@@ -64,6 +64,13 @@ class JsonThoughtRepository(private val context: Context) : ThoughtRepository {
         }
     }
 
+    override suspend fun lastUpdatedMillisForDay(dayKey: String): Long? = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val file = dayFile(dayKey)
+            if (file.exists() && file.isFile) file.lastModified() else null
+        }
+    }
+
     /**
      * Reads and parses a day file into domain models.
      */
