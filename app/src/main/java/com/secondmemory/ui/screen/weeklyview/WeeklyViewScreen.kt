@@ -167,14 +167,27 @@ fun WeeklyViewScreen(
                     
                     if (weekKey != null) {
                         seenKeys.add(weekKey)
-                        // If the job is active, add it to the set to show loading indicators
-                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
-                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                        val isFinished = info.state.isFinished
+                        
+                        if (!isFinished) {
+                            // If the job is active, add it to the set to show loading indicators
                             busyKeys.add(weekKey)
-                        } 
-                        // If a job we were actively tracking just finished successfully, trigger a list refresh
-                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeWeeks.contains(weekKey)) {
-                            shouldRefresh = true
+                        } else if (activeSummarizeWeeks.contains(weekKey)) {
+                            // Terminal state reached. If we were tracking this key, show result feedback.
+                            when (info.state) {
+                                androidx.work.WorkInfo.State.SUCCEEDED -> {
+                                    shouldRefresh = true
+                                    scope.launch { snackbarHostState.showSnackbar("Weekly summary generated for $weekKey") }
+                                }
+                                androidx.work.WorkInfo.State.FAILED -> {
+                                    val error = info.outputData.getString("error") ?: "Unknown error"
+                                    scope.launch { snackbarHostState.showSnackbar("Failed for $weekKey: $error") }
+                                }
+                                androidx.work.WorkInfo.State.CANCELLED -> {
+                                    scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $weekKey") }
+                                }
+                                else -> {}
+                            }
                         }
                     }
                 }

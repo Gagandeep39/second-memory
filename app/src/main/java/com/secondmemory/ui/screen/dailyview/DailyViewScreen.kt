@@ -221,21 +221,32 @@ fun DailyViewScreen(
                     
                     if (dayKey != null) {
                         seenKeys.add(dayKey)
-                        // If the job is active, add it to the set to show loading indicators
-                        if (info.state == androidx.work.WorkInfo.State.RUNNING || 
-                            info.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                        val isFinished = info.state.isFinished
+                        
+                        if (!isFinished) {
+                            // If the job is active, add it to the set to show loading indicators
                             busyKeys.add(dayKey)
-                        } 
-                        // If a job we were actively tracking just finished successfully, trigger a list refresh
-                        else if (info.state == androidx.work.WorkInfo.State.SUCCEEDED && activeSummarizeDays.contains(dayKey)) {
-                            shouldRefresh = true
+                        } else if (activeSummarizeDays.contains(dayKey)) {
+                            // Terminal state reached. If we were tracking this key, show result feedback.
+                            when (info.state) {
+                                androidx.work.WorkInfo.State.SUCCEEDED -> {
+                                    shouldRefresh = true
+                                    scope.launch { snackbarHostState.showSnackbar("Summary generated for $dayKey") }
+                                }
+                                androidx.work.WorkInfo.State.FAILED -> {
+                                    val error = info.outputData.getString("error") ?: "Unknown error"
+                                    scope.launch { snackbarHostState.showSnackbar("Failed for $dayKey: $error") }
+                                }
+                                androidx.work.WorkInfo.State.CANCELLED -> {
+                                    scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $dayKey") }
+                                }
+                                else -> {}
+                            }
                         }
                     }
                 }
                 
-                // Update activeSummarizeDays:
-                // 1. Include everything currently "busy" in WorkManager
-                // 2. Keep everything we just started locally that WorkManager hasn't reported on yet (optimistic UI)
+                // Update activeSummarizeDays with optimistic UI logic
                 activeSummarizeDays = busyKeys + (activeSummarizeDays - seenKeys)
 
                 if (shouldRefresh) {
