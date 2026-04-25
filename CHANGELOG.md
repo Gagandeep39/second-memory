@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 9.0
+
+- Updated to markdown
+- Removed infinite retries for No network connectivity
+- Snackbar now dismisses immediately when a new one is added in queue
+
 ## 8.0
 
 - Add support for multiple LLM sources and custom prompt
