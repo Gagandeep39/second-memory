@@ -44,6 +44,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.secondmemory.background.DailySummaryWorker
@@ -229,15 +231,15 @@ fun DailyViewScreen(
                         } else if (activeSummarizeDays.contains(dayKey)) {
                             // Terminal state reached. If we were tracking this key, show result feedback.
                             when (info.state) {
-                                androidx.work.WorkInfo.State.SUCCEEDED -> {
+                                WorkInfo.State.SUCCEEDED -> {
                                     shouldRefresh = true
                                     scope.launch { snackbarHostState.showSnackbar("Summary generated for $dayKey") }
                                 }
-                                androidx.work.WorkInfo.State.FAILED -> {
+                                WorkInfo.State.FAILED -> {
                                     val error = info.outputData.getString("error") ?: "Unknown error"
                                     scope.launch { snackbarHostState.showSnackbar("Failed for $dayKey: $error") }
                                 }
-                                androidx.work.WorkInfo.State.CANCELLED -> {
+                                WorkInfo.State.CANCELLED -> {
                                     scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $dayKey") }
                                 }
                                 else -> {}
@@ -527,7 +529,7 @@ fun DailyViewScreen(
             }
             // Overlay loading indicator
             if (activeSummarizeDays.isNotEmpty()) {
-                androidx.compose.material3.LinearProgressIndicator(
+                LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)

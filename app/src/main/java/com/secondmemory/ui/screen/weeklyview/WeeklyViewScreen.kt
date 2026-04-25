@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.secondmemory.background.WeeklySummaryWorker
@@ -175,15 +176,15 @@ fun WeeklyViewScreen(
                         } else if (activeSummarizeWeeks.contains(weekKey)) {
                             // Terminal state reached. If we were tracking this key, show result feedback.
                             when (info.state) {
-                                androidx.work.WorkInfo.State.SUCCEEDED -> {
+                                WorkInfo.State.SUCCEEDED -> {
                                     shouldRefresh = true
                                     scope.launch { snackbarHostState.showSnackbar("Weekly summary generated for $weekKey") }
                                 }
-                                androidx.work.WorkInfo.State.FAILED -> {
+                                WorkInfo.State.FAILED -> {
                                     val error = info.outputData.getString("error") ?: "Unknown error"
                                     scope.launch { snackbarHostState.showSnackbar("Failed for $weekKey: $error") }
                                 }
-                                androidx.work.WorkInfo.State.CANCELLED -> {
+                                WorkInfo.State.CANCELLED -> {
                                     scope.launch { snackbarHostState.showSnackbar("Summary cancelled for $weekKey") }
                                 }
                                 else -> {}
