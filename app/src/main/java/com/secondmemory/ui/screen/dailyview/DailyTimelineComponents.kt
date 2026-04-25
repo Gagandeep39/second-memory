@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -133,10 +132,10 @@ fun TimelineItem(
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.3f,
+        targetValue = 1.2f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
         label = "pulseScale"
     )
@@ -203,7 +202,7 @@ fun TimelineItem(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(bottom = 20.dp, top = 4.dp)
+                .padding(end = 12.dp, bottom = 24.dp, top = 4.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -238,36 +237,31 @@ fun TimelineItem(
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 } else if (hasThoughts) {
-                    IconButton(
-                        onClick = onSummarize,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Summarize",
-                            tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Surface(
+                            onClick = onSummarize,
+                            shape = CircleShape,
+                            color = if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else Color.Transparent,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Summarize",
+                                    tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 } else {
                     Spacer(modifier = Modifier.width(40.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Activity Distribution Sparkline
-            if (hasThoughts) {
-                ActivitySparkline(timestamps = item.thoughtTimestamps)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
             val statusText = item.getStatusText()
-
             if (statusText != null) {
+                Spacer(modifier = Modifier.height(10.dp))
                 if (item.needsRefresh || (hasThoughts && !item.hasSummary)) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -308,6 +302,13 @@ fun TimelineItem(
                         modifier = Modifier.padding(start = 4.dp)
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Activity Distribution Sparkline
+            if (hasThoughts) {
+                ActivitySparkline(timestamps = item.thoughtTimestamps)
             }
         }
     }
@@ -429,14 +430,6 @@ private fun ActivitySparkline(timestamps: List<Long>) {
                     strokeWidth = 1.dp.toPx()
                 )
             }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().alpha(0.4f),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("00:00", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
-            Text("12:00", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
-            Text("23:59", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
         }
     }
 }
