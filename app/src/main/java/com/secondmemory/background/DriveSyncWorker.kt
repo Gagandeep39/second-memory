@@ -38,20 +38,13 @@ class DriveSyncWorker(
             source = "DriveSyncWorker",
         )
         ensureAppDataDirectories(applicationContext)
-        // Pre-check for actual internet connectivity
-        if (!hasInternetConnection()) {
-            operationLogRepository.appendLog(
-                category = "WORK",
-                action = "Drive worker no internet",
-                status = "RETRY",
-                details = "No internet connectivity detected",
-                source = "DriveSyncWorker",
-            )
-            return Result.retry()
-        }
+
         val settings = settingsRepository.currentSettings()
 
         return runCatching {
+            if (!hasInternetConnection()) {
+                throw java.io.IOException("No internet connectivity detected")
+            }
             syncRepository.syncNow(
                 driveSyncEnabled = true,
                 accountEmail = settings.connectedGoogleAccountEmail,
@@ -65,14 +58,16 @@ class DriveSyncWorker(
             )
             Result.success()
         }.getOrElse { error ->
+            val retry = shouldRetryWork(error, runAttemptCount)
+            val errorMessage = error.message ?: "Background drive sync failed"
             operationLogRepository.appendLog(
                 category = "WORK",
                 action = "Drive worker failed",
-                status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
-                details = error.message ?: "Background drive sync failed",
+                status = if (retry) "RETRY" else "ERROR",
+                details = "$errorMessage (attempt ${runAttemptCount + 1})",
                 source = "DriveSyncWorker",
             )
-            if (shouldRetryWork(error)) {
+            if (retry) {
                 Result.retry()
             } else {
                 Result.failure(errorData(error))

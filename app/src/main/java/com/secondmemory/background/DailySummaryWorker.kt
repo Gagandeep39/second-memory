@@ -51,17 +51,7 @@ class DailySummaryWorker(
             source = "DailySummaryWorker",
         )
         ensureAppDataDirectories(applicationContext)
-        // Pre-check for actual internet connectivity
-        if (!hasInternetConnection()) {
-            operationLogRepository.appendLog(
-                category = "WORK",
-                action = "Daily summary worker no internet",
-                status = "RETRY",
-                details = "No internet connectivity detected",
-                source = "DailySummaryWorker",
-            )
-            return Result.retry()
-        }
+
         val settings = settingsRepository.currentSettings()
         val rawJson = thoughtRepository.readRawJson(targetDayKey)
         if (rawJson.isBlank()) {
@@ -76,6 +66,9 @@ class DailySummaryWorker(
         }
 
         return runCatching {
+            if (!hasInternetConnection()) {
+                throw java.io.IOException("No internet connectivity detected")
+            }
             val markdown = llmSummaryClient.summarizeDay(
                 dayKey = targetDayKey,
                 rawJson = rawJson,
@@ -95,14 +88,16 @@ class DailySummaryWorker(
             )
             Result.success()
         }.getOrElse { error ->
+            val retry = shouldRetryWork(error, runAttemptCount)
+            val errorMessage = error.message ?: "Daily summary generation failed"
             operationLogRepository.appendLog(
                 category = "WORK",
                 action = "Daily summary worker failed",
-                status = if (shouldRetryWork(error)) "RETRY" else "ERROR",
-                details = error.message ?: "Daily summary generation failed",
+                status = if (retry) "RETRY" else "ERROR",
+                details = "$errorMessage (attempt ${runAttemptCount + 1})",
                 source = "DailySummaryWorker",
             )
-            if (shouldRetryWork(error)) {
+            if (retry) {
                 Result.retry()
             } else {
                 Result.failure(errorData(error))
