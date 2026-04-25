@@ -1,11 +1,15 @@
 package com.secondmemory.ui.screen.dailyview
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -174,7 +178,7 @@ fun DailyViewScreen(
                 return@launch
             }
 
-            activeSummarizeDays = activeSummarizeDays + dayKey
+            activeSummarizeDays += dayKey
 
             val workRequest = OneTimeWorkRequestBuilder<DailySummaryWorker>()
                 .setInputData(workDataOf(DailySummaryWorker.KEY_DAY_KEY to dayKey))
@@ -187,7 +191,7 @@ fun DailyViewScreen(
                 action = "Generate summary",
                 status = "STARTED",
                 details = "dayKey=$dayKey",
-                source = "DailyViewScreen"
+                source = "DailyViewScreen",
             )
 
             workManager.enqueueUniqueWork(
@@ -207,7 +211,7 @@ fun DailyViewScreen(
                 var shouldRefresh = false
                 
                 infos.forEach { info ->
-                    val dayKeyTag = info.tags.firstOrNull { it.startsWith("summary_") && it != "summary_job" }
+                    val dayKeyTag = info.tags.firstOrNull { (it.startsWith("summary_") && it != "summary_job") }
                     val dayKey = dayKeyTag?.removePrefix("summary_")
                     
                     if (dayKey != null) {
@@ -235,18 +239,41 @@ fun DailyViewScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 title = {
-                    Column {
-                        Text(
-                            text = "Journal",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = "Daily",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Medium
+                    )
                 },
                 actions = {
-                    if (!isCurrentWeek) {
-                        IconButton(onClick = { selectedWeekStart = currentWeekStart }) {
-                            Icon(Icons.Default.Today, contentDescription = "Back to today")
+                    AnimatedVisibility(
+                        visible = !isCurrentWeek,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                    ) {
+                        Surface(
+                            onClick = { selectedWeekStart = currentWeekStart },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Today,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "This Week",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -273,13 +300,18 @@ fun DailyViewScreen(
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Week Selector Bar (Old Style)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // Week Selector Bar
                 Surface(
                     tonalElevation = 2.dp,
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(4.dp),
@@ -334,12 +366,15 @@ fun DailyViewScreen(
                             onSummarize = { summarizeDay(item.dayKey) }
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(100.dp)) }
                 }
             }
 
             if (activeSummarizeDays.isNotEmpty()) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter))
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                )
             }
         }
     }
@@ -403,7 +438,7 @@ private fun TimelineItem(
     )
 
     val nodeSize = if (isToday) 14.dp else 10.dp
-    val bloomMultiplier = (item.thoughtCount.coerceAtMost(20) / 10f).coerceAtLeast(1f)
+    val bloomMultiplier = 1f + (item.thoughtCount.toFloat() / 20f).coerceAtMost(1f)
     val finalNodeSize = nodeSize * bloomMultiplier
 
     val baseColor = when {
@@ -419,7 +454,7 @@ private fun TimelineItem(
             .fillMaxWidth()
             .height(IntrinsicSize.Max)
             .clickable(enabled = item.hasSummary) { onOpen() }
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 0.dp),
         verticalAlignment = Alignment.Top
     ) {
         // Timeline Column
@@ -441,7 +476,7 @@ private fun TimelineItem(
             // Node with Bloom Effect
             Box(
                 modifier = Modifier
-                    .padding(top = 16.dp)
+                    .padding(top = 12.dp)
                     .size(finalNodeSize)
                     .scale(if (item.needsRefresh) pulseScale else 1f)
                     .clip(CircleShape)
@@ -458,11 +493,12 @@ private fun TimelineItem(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(bottom = 32.dp, top = 8.dp)
+                .padding(bottom = 20.dp, top = 4.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Journal Stamp Look
                 Surface(
@@ -470,17 +506,17 @@ private fun TimelineItem(
                     color = if (isToday) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
                         Text(
                             text = date.format(DateTimeFormatter.ofPattern("EEEE")).uppercase(),
                             style = MaterialTheme.typography.labelSmall,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                         Text(
                             text = date.format(DateTimeFormatter.ofPattern("MMM dd")),
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
                             color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                         )
@@ -488,80 +524,80 @@ private fun TimelineItem(
                 }
                 
                 if (isBusy) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    }
                 } else if (hasThoughts) {
                     IconButton(
                         onClick = onSummarize,
                         modifier = Modifier
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer else Color.Transparent)
+                            .background(if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else Color.Transparent)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Summarize",
                             tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
+                } else {
+                    Spacer(modifier = Modifier.width(40.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Activity Distribution Sparkline
             if (hasThoughts) {
                 ActivitySparkline(timestamps = item.thoughtTimestamps)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            val statusText = when {
-                item.needsRefresh -> {
-                    val newCount = if (item.summaryLastUpdatedMillis != null) {
-                        item.thoughtTimestamps.count { it > (item.summaryLastUpdatedMillis + 1000) }
-                    } else 0
-                    if (newCount > 0) "$newCount new captures since last synthesis" else "Synthesis needs update"
-                }
-                item.hasSummary -> "Summary synchronized"
-                hasThoughts -> "${item.thoughtCount} captures awaiting synthesis"
-                else -> "No activity recorded"
-            }
+            val statusText = item.getStatusText()
 
-            if (item.hasSummary || hasThoughts) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f) 
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    border = BorderStroke(1.dp, 
-                        if (item.needsRefresh) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            if (statusText != null) {
+                if (item.needsRefresh || (hasThoughts && !item.hasSummary)) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f) 
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        border = BorderStroke(1.dp, 
+                            if (item.needsRefresh) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
                     ) {
-                        Icon(
-                            if (item.hasSummary && !item.needsRefresh) Icons.Default.AutoAwesome else Icons.Default.Refresh, 
-                            null, 
-                            modifier = Modifier.size(16.dp), 
-                            tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val iconColor = if (item.needsRefresh) MaterialTheme.colorScheme.error 
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            
+                            Icon(
+                                Icons.Default.Refresh, 
+                                null, 
+                                modifier = Modifier.size(16.dp), 
+                                tint = iconColor
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                } else {
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
                 }
-            } else {
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
             }
         }
     }
@@ -637,6 +673,32 @@ private data class DaySummaryItem(
                 summaryLastUpdatedMillis != null &&
                 lastThoughtUpdatedMillis != null &&
                 lastThoughtUpdatedMillis > (summaryLastUpdatedMillis + 1000)
+
+    /**
+     * Returns a user-friendly status message based on the current state of the day's activity.
+     */
+    fun getStatusText(): String? {
+        if (needsRefresh) {
+            val newCount = if (summaryLastUpdatedMillis != null) {
+                thoughtTimestamps.count { it > (summaryLastUpdatedMillis + 1000) }
+            } else 0
+            return if (newCount > 0) {
+                "$newCount new captures since last synthesis"
+            } else {
+                "Synthesis out of date"
+            }
+        }
+        
+        if (!hasSummary) {
+            return if (thoughtCount > 0) {
+                "$thoughtCount captures awaiting synthesis"
+            } else {
+                "No activity recorded"
+            }
+        }
+
+        return null // Synchronized - hide label
+    }
 }
 
 private fun formatWeekRange(start: LocalDate): String {
