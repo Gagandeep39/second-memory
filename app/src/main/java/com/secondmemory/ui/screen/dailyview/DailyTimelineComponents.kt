@@ -148,7 +148,7 @@ fun TimelineItem(
     val baseColor = when {
         isBusy -> MaterialTheme.colorScheme.primary
         item.needsRefresh -> MaterialTheme.colorScheme.error
-        item.hasSummary -> Color.Cyan
+        item.hasSummary -> MaterialTheme.colorScheme.primary
         hasThoughts -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
         else -> MaterialTheme.colorScheme.outlineVariant
     }
@@ -323,6 +323,9 @@ private fun ActivitySparkline(timestamps: List<Long>) {
     var scrubTime by remember { mutableStateOf<Long?>(null) }
     var scrubX by remember { mutableFloatStateOf(0f) }
 
+    val activityColor = MaterialTheme.colorScheme.primary
+    val onActivityColor = MaterialTheme.colorScheme.onPrimaryContainer
+
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         // Scrubbing Info Overlay
         AnimatedVisibility(
@@ -333,8 +336,8 @@ private fun ActivitySparkline(timestamps: List<Long>) {
             scrubTime?.let { ts ->
                 Box(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
                     Surface(
-                        color = Color.Cyan.copy(alpha = 0.15f),
-                        contentColor = Color.Cyan,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = onActivityColor,
                         shape = RoundedCornerShape(4.dp),
                         modifier = Modifier.align(Alignment.Center)
                     ) {
@@ -356,12 +359,12 @@ private fun ActivitySparkline(timestamps: List<Long>) {
                 .pointerInput(timestamps) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
-                            scrubX = offset.x
-                            scrubTime = findClosestTimestamp(offset.x, size.width.toFloat(), timestamps)
+                            scrubX = offset.x.coerceIn(0f, size.width.toFloat())
+                            scrubTime = findClosestTimestamp(scrubX, size.width.toFloat(), timestamps)
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         },
                         onDrag = { change, _ ->
-                            val newX = change.position.x
+                            val newX = change.position.x.coerceIn(0f, size.width.toFloat())
                             scrubX = newX // Update position smoothly
                             val newTime = findClosestTimestamp(newX, size.width.toFloat(), timestamps)
                             if (newTime != scrubTime) {
@@ -399,7 +402,7 @@ private fun ActivitySparkline(timestamps: List<Long>) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            if (isScrubbed) Color.White.copy(alpha = 0.6f) else Color.Cyan.copy(alpha = 0.4f), 
+                            if (isScrubbed) activityColor.copy(alpha = 0.6f) else activityColor.copy(alpha = 0.4f), 
                             Color.Transparent
                         ),
                         center = Offset(x, height / 2),
@@ -411,7 +414,7 @@ private fun ActivitySparkline(timestamps: List<Long>) {
                 
                 // Inner core
                 drawCircle(
-                    color = if (isScrubbed) Color.White else Color.Cyan,
+                    color = if (isScrubbed) onActivityColor else activityColor,
                     radius = if (isScrubbed) 4.dp.toPx() else 3.dp.toPx(),
                     center = Offset(x, height / 2)
                 )
@@ -420,7 +423,7 @@ private fun ActivitySparkline(timestamps: List<Long>) {
             // Scrub indicator line
             if (scrubTime != null) {
                 drawLine(
-                    color = Color.Cyan.copy(alpha = 0.5f),
+                    color = activityColor.copy(alpha = 0.5f),
                     start = Offset(scrubX, 0f),
                     end = Offset(scrubX, height),
                     strokeWidth = 1.dp.toPx()
