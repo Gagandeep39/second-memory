@@ -1,24 +1,28 @@
 package com.secondmemory.ui.screen.dailyview
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,26 +35,19 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,31 +65,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.secondmemory.background.DailySummaryWorker
-import com.secondmemory.domain.llm.LlmSummaryClient
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
-import com.secondmemory.domain.model.DailySummaryFile
 import com.secondmemory.domain.repository.DailySummaryRepository
 import com.secondmemory.domain.repository.OperationLogRepository
 import com.secondmemory.domain.repository.SettingsRepository
 import com.secondmemory.domain.repository.ThoughtRepository
-import com.secondmemory.ui.component.AppSnackbar
 import com.secondmemory.ui.component.showSnackbarImmediate
-import com.secondmemory.util.dayKeyDisplayText
 import com.secondmemory.util.formatDateTime
 import com.secondmemory.util.todayDayKey
-import com.secondmemory.util.todayUtcStartOfDayMillis
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.Instant
@@ -102,7 +99,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 
 /**
- * Screen that lists daily summary markdown files and can generate/open summaries.
+ * A creative, timeline-based view of daily reflections with activity visualization.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +108,6 @@ fun DailyViewScreen(
     dailySummaryRepository: DailySummaryRepository,
     settingsRepository: SettingsRepository,
     operationLogRepository: OperationLogRepository,
-    llmSummaryClient: LlmSummaryClient,
     snackbarHostState: SnackbarHostState,
     onOpenSummary: (String) -> Unit,
 ) {
@@ -122,50 +118,45 @@ fun DailyViewScreen(
     var activeSummarizeDays by remember { mutableStateOf(setOf<String>()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showViewDatePicker by remember { mutableStateOf(false) }
-    var datePickerSeedMillis by remember { mutableStateOf(todayUtcStartOfDayMillis()) }
+    
     var selectedWeekStart by remember {
         mutableStateOf(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)))
     }
+    
     val listState = rememberLazyListState()
     val summarizeFabExpanded by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 8
+            (listState.firstVisibleItemIndex == 0) && (listState.firstVisibleItemScrollOffset < 8)
         }
     }
 
     val currentWeekStart = remember { LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
     val isCurrentWeek = selectedWeekStart == currentWeekStart
 
-    val filteredItems = remember(dayItems, selectedWeekStart) {
-        val weekEnd = selectedWeekStart.plusDays(6)
-        dayItems.filter { item ->
-            val date = try {
-                LocalDate.parse(item.dayKey, DateTimeFormatter.BASIC_ISO_DATE)
-            } catch (e: Exception) {
-                null
-            }
-            date != null && !date.isBefore(selectedWeekStart) && !date.isAfter(weekEnd)
-        }.sortedByDescending { it.dayKey }
-    }
-
     fun refresh() {
         scope.launch {
             val summaries = dailySummaryRepository.listDailySummaries()
-            dayItems = summaries.map { summaryFile ->
-                val markdown = dailySummaryRepository.readSummary(summaryFile.fileName)
-                val thoughtCount = thoughtRepository.listForDay(summaryFile.dayKey).size
-                val lastSummaryUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
-                val lastThoughtUpdatedMillis = thoughtRepository.lastUpdatedMillisForDay(summaryFile.dayKey)
+            val today = LocalDate.now()
+            val weekDays = (0..6).map { selectedWeekStart.plusDays(it.toLong()) }
+                .filter { !it.isAfter(today) }
+                .map { it.format(DateTimeFormatter.BASIC_ISO_DATE) }
+            
+            dayItems = weekDays.map { dayKey ->
+                val summaryFile = summaries.find { it.dayKey == dayKey }
+                val lastSummaryUpdatedMillis = dailySummaryRepository.lastUpdatedMillisForDay(dayKey)
+                val lastThoughtUpdatedMillis = thoughtRepository.lastUpdatedMillisForDay(dayKey)
+                val thoughts = thoughtRepository.listForDay(dayKey)
+                
                 DaySummaryItem(
-                    dayKey = summaryFile.dayKey,
-                    hasSummary = true,
-                    thoughtCount = thoughtCount,
-                    summaryWordCount = markdown.wordCount(),
+                    dayKey = dayKey,
+                    hasSummary = summaryFile != null,
+                    thoughtCount = thoughts.size,
+                    thoughtTimestamps = thoughts.map { it.timestampMillis },
                     summaryLastUpdatedMillis = lastSummaryUpdatedMillis,
                     lastThoughtUpdatedMillis = lastThoughtUpdatedMillis,
-                    fileName = summaryFile.fileName,
+                    fileName = summaryFile?.fileName ?: "",
                 )
-            }
+            }.sortedByDescending { it.dayKey }
         }
     }
 
@@ -179,7 +170,7 @@ fun DailyViewScreen(
 
             val rawJson = thoughtRepository.readRawJson(dayKey)
             if (rawJson.isBlank()) {
-                snackbarHostState.showSnackbarImmediate("Raw JSON for $dayKey is empty or missing.")
+                snackbarHostState.showSnackbarImmediate("No thoughts recorded for $dayKey.")
                 return@launch
             }
 
@@ -195,7 +186,7 @@ fun DailyViewScreen(
                 category = "SUMMARY",
                 action = "Generate summary",
                 status = "STARTED",
-                details = "dayKey=$dayKey, provider=${settings.aiProvider}",
+                details = "dayKey=$dayKey",
                 source = "DailyViewScreen"
             )
 
@@ -204,14 +195,11 @@ fun DailyViewScreen(
                 ExistingWorkPolicy.REPLACE,
                 workRequest
             )
-
-            snackbarHostState.showSnackbarImmediate("Summary requested for $dayKey.")
         }
     }
 
-    // Monitor all summary jobs reactively to update UI loading states
+    // Monitor WorkManager
     LaunchedEffect(Unit) {
-        // Observe all jobs tagged with "summary_job" to track their progress
         workManager.getWorkInfosByTagFlow("summary_job")
             .collect { infos ->
                 val busyKeys = mutableSetOf<String>()
@@ -219,108 +207,25 @@ fun DailyViewScreen(
                 var shouldRefresh = false
                 
                 infos.forEach { info ->
-                    // Extract the specific dayKey from tags (e.g., "summary_20240101").
-                    // Since WorkManager doesn't expose input data while running, we encode the date in a tag.
                     val dayKeyTag = info.tags.firstOrNull { it.startsWith("summary_") && it != "summary_job" }
                     val dayKey = dayKeyTag?.removePrefix("summary_")
                     
                     if (dayKey != null) {
                         seenKeys.add(dayKey)
-                        val isFinished = info.state.isFinished
-                        
-                        if (!isFinished) {
-                            // If the job is active, add it to the set to show loading indicators
+                        if (!info.state.isFinished) {
                             busyKeys.add(dayKey)
                         } else if (activeSummarizeDays.contains(dayKey)) {
-                            // Terminal state reached. If we were tracking this key, show result feedback.
-                            when (info.state) {
-                                WorkInfo.State.SUCCEEDED -> {
-                                    shouldRefresh = true
-                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary generated for $dayKey") }
-                                }
-                                WorkInfo.State.FAILED -> {
-                                    val error = info.outputData.getString("error") ?: "Unknown error"
-                                    scope.launch { snackbarHostState.showSnackbarImmediate("Failed for $dayKey: $error") }
-                                }
-                                WorkInfo.State.CANCELLED -> {
-                                    scope.launch { snackbarHostState.showSnackbarImmediate("Summary cancelled for $dayKey") }
-                                }
-                                else -> {}
-                            }
+                            if (info.state == WorkInfo.State.SUCCEEDED) shouldRefresh = true
                         }
                     }
                 }
-                
-                // Update activeSummarizeDays with optimistic UI logic
                 activeSummarizeDays = busyKeys + (activeSummarizeDays - seenKeys)
-
-                if (shouldRefresh) {
-                    refresh()
-                }
+                if (shouldRefresh) refresh()
             }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedWeekStart) {
         refresh()
-    }
-
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = datePickerSeedMillis,
-        )
-
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val selectedDayKey = datePickerState.selectedDateMillis
-                            ?.let(::dayKeyFromUtcMillis)
-                            ?: dayKeyFromUtcMillis(datePickerSeedMillis)
-                        showDatePicker = false
-                        scope.launch {
-                            summarizeDay(selectedDayKey)
-                        }
-                    },
-                ) {
-                    Text("Generate")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
-                }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showViewDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedWeekStart.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-        )
-        DatePickerDialog(
-            onDismissRequest = { showViewDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        val date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
-                        selectedWeekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                    }
-                    showViewDatePicker = false
-                }) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showViewDatePicker = false }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
     }
 
     Scaffold(
@@ -330,41 +235,18 @@ fun DailyViewScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 title = {
-                    Text(
-                        text = "Daily",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    Column {
+                        Text(
+                            text = "Journal",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 actions = {
-                    AnimatedVisibility(
-                        visible = !isCurrentWeek,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut(),
-                    ) {
-                        Surface(
-                            onClick = { selectedWeekStart = currentWeekStart },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Today,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    "This Week",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                    if (!isCurrentWeek) {
+                        IconButton(onClick = { selectedWeekStart = currentWeekStart }) {
+                            Icon(Icons.Default.Today, contentDescription = "Back to today")
                         }
                     }
                 }
@@ -376,69 +258,31 @@ fun DailyViewScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 FloatingActionButton(
-                    onClick = {
-                        if (activeSummarizeDays.isEmpty()) {
-                            datePickerSeedMillis = todayUtcStartOfDayMillis()
-                            showDatePicker = true
-                        }
-                    },
-                    containerColor = if (activeSummarizeDays.isNotEmpty()) 
-                        MaterialTheme.colorScheme.surfaceVariant 
-                    else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (activeSummarizeDays.isNotEmpty()) 
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
-                    else MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = { showDatePicker = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarMonth,
-                        contentDescription = "Pick summary date",
-                    )
+                    Icon(Icons.Default.CalendarMonth, contentDescription = "Pick date")
                 }
                 ExtendedFloatingActionButton(
-                    onClick = {
-                        if (activeSummarizeDays.isEmpty()) {
-                            scope.launch {
-                                summarizeDay(dayKeyFromUtcMillis(todayUtcStartOfDayMillis()))
-                            }
-                        }
-                    },
+                    onClick = { summarizeDay(todayDayKey()) },
                     text = { Text("Summarize") },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.AutoAwesome,
-                            contentDescription = "Summarize today",
-                        )
-                    },
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
                     expanded = summarizeFabExpanded,
-                    containerColor = if (activeSummarizeDays.isNotEmpty()) 
-                        MaterialTheme.colorScheme.surfaceVariant 
-                    else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (activeSummarizeDays.isNotEmpty()) 
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) 
-                    else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()
-            .padding(innerPadding)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                // Week Selector Bar
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Week Selector Bar (Old Style)
                 Surface(
                     tonalElevation = 2.dp,
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -478,64 +322,245 @@ fun DailyViewScreen(
                     }
                 }
 
-                if (filteredItems.isNotEmpty()) {
-                    Text(
-                        text = "${filteredItems.size} summaries",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-
-                if (filteredItems.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "No summaries for this week",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Tap to generate a summary of your daily reflections",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(dayItems, key = { it.dayKey }) { item ->
+                        TimelineItem(
+                            item = item,
+                            isBusy = activeSummarizeDays.contains(item.dayKey),
+                            onOpen = { if (item.hasSummary) onOpenSummary(item.fileName) },
+                            onSummarize = { summarizeDay(item.dayKey) }
+                        )
                     }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    item { Spacer(modifier = Modifier.height(100.dp)) }
+                }
+            }
+
+            if (activeSummarizeDays.isNotEmpty()) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter))
+            }
+        }
+    }
+
+    // Dialogs
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        val dayKey = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
+                        summarizeDay(dayKey)
+                    }
+                    showDatePicker = false
+                }) { Text("Summarize") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showViewDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedWeekStart.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { showViewDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        selectedWeekStart = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    }
+                    showViewDatePicker = false
+                }) { Text("View Week") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+}
+
+/**
+ * A creative vertical timeline entry for one day.
+ */
+@Composable
+private fun TimelineItem(
+    item: DaySummaryItem,
+    isBusy: Boolean,
+    onOpen: () -> Unit,
+    onSummarize: () -> Unit,
+) {
+    val date = LocalDate.parse(item.dayKey, DateTimeFormatter.BASIC_ISO_DATE)
+    val isToday = item.dayKey == todayDayKey()
+    val hasThoughts = item.thoughtCount > 0
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    val nodeSize = if (isToday) 14.dp else 10.dp
+    val bloomMultiplier = (item.thoughtCount.coerceAtMost(20) / 10f).coerceAtLeast(1f)
+    val finalNodeSize = nodeSize * bloomMultiplier
+
+    val baseColor = when {
+        isBusy -> MaterialTheme.colorScheme.primary
+        item.needsRefresh -> MaterialTheme.colorScheme.error
+        item.hasSummary -> MaterialTheme.colorScheme.primary
+        hasThoughts -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Max)
+            .clickable(enabled = item.hasSummary) { onOpen() }
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Timeline Column
+        Box(
+            modifier = Modifier.width(48.dp).fillMaxHeight(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            // Continuous dashed line
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawLine(
+                    color = baseColor.copy(alpha = 0.2f),
+                    start = Offset(size.width / 2, 0f),
+                    end = Offset(size.width / 2, size.height),
+                    strokeWidth = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+            }
+            
+            // Node with Bloom Effect
+            Box(
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .size(finalNodeSize)
+                    .scale(if (item.needsRefresh) pulseScale else 1f)
+                    .clip(CircleShape)
+                    .background(baseColor)
+                    .then(
+                        if (item.hasSummary && !item.needsRefresh) {
+                            Modifier.border(2.dp, MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                        } else Modifier
+                    )
+            )
+        }
+
+        // Content Column
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 32.dp, top = 8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Journal Stamp Look
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isToday) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        Text(
+                            text = date.format(DateTimeFormatter.ofPattern("EEEE")).uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = date.format(DateTimeFormatter.ofPattern("MMM dd")),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Black,
+                            color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else if (hasThoughts) {
+                    IconButton(
+                        onClick = onSummarize,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer else Color.Transparent)
                     ) {
-                        items(filteredItems, key = { item -> item.dayKey }) { item ->
-                            DailySummaryItem(
-                                item = item,
-                                isBusy = activeSummarizeDays.contains(item.dayKey),
-                                onOpen = { onOpenSummary(item.fileName) },
-                                onSummarize = {
-                                    summarizeDay(item.dayKey)
-                                },
-                            )
-                        }
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Summarize",
+                            tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }
-            // Overlay loading indicator
-            if (activeSummarizeDays.isNotEmpty()) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Activity Distribution Sparkline
+            if (hasThoughts) {
+                ActivitySparkline(timestamps = item.thoughtTimestamps)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            val statusText = when {
+                item.needsRefresh -> {
+                    val newCount = if (item.summaryLastUpdatedMillis != null) {
+                        item.thoughtTimestamps.count { it > (item.summaryLastUpdatedMillis + 1000) }
+                    } else 0
+                    if (newCount > 0) "$newCount new captures since last synthesis" else "Synthesis needs update"
+                }
+                item.hasSummary -> "Summary synchronized"
+                hasThoughts -> "${item.thoughtCount} captures awaiting synthesis"
+                else -> "No activity recorded"
+            }
+
+            if (item.hasSummary || hasThoughts) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (item.needsRefresh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f) 
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    border = BorderStroke(1.dp, 
+                        if (item.needsRefresh) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (item.hasSummary && !item.needsRefresh) Icons.Default.AutoAwesome else Icons.Default.Refresh, 
+                            null, 
+                            modifier = Modifier.size(16.dp), 
+                            tint = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = if (item.needsRefresh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
         }
@@ -543,205 +568,78 @@ fun DailyViewScreen(
 }
 
 /**
- * Row card representing one summary day and its actions.
+ * A minimalist horizontal sparkline showing the distribution of thoughts over 24 hours.
  */
 @Composable
-private fun DailySummaryItem(
-    item: DaySummaryItem,
-    isBusy: Boolean,
-    onOpen: () -> Unit,
-    onSummarize: () -> Unit,
-) {
-    val isToday = item.dayKey == todayDayKey()
-
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onOpen,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-            else MaterialTheme.colorScheme.surface,
-        ),
-        border = BorderStroke(
-            width = if (isToday) 2.dp else 1.dp,
-            color = if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant
-        )
-    ) {
+private fun ActivitySparkline(timestamps: List<Long>) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(16.dp)) {
+            val width = size.width
+            val height = size.height
+            
+            // Background track
+            drawLine(
+                color = Color.Gray.copy(alpha = 0.1f),
+                start = Offset(0f, height / 2),
+                end = Offset(width, height / 2),
+                strokeWidth = 1.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+            
+            // Thought Pips - using Local Time for positioning
+            timestamps.forEach { ts ->
+                val localDateTime = Instant.ofEpochMilli(ts).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                val totalMinutes = localDateTime.hour * 60 + localDateTime.minute
+                val dayFraction = totalMinutes / 1440f // 1440 minutes in a day
+                val x = dayFraction * width
+                
+                // Outer glow
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.Cyan.copy(alpha = 0.4f), Color.Transparent),
+                        center = Offset(x, height / 2),
+                        radius = 10.dp.toPx()
+                    ),
+                    radius = 10.dp.toPx(),
+                    center = Offset(x, height / 2)
+                )
+                
+                // Inner core
+                drawCircle(
+                    color = Color.Cyan,
+                    radius = 3.dp.toPx(),
+                    center = Offset(x, height / 2)
+                )
+            }
+        }
         Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth().alpha(0.4f),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = dayKeyDisplayText(item.dayKey),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
-                    if (item.needsRefresh) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                "Outdated",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetadataBadge(
-                        icon = Icons.AutoMirrored.Filled.Message,
-                        text = "${item.thoughtCount} thoughts"
-                    )
-                    MetadataBadge(
-                        icon = Icons.Default.Description,
-                        text = "${item.summaryWordCount} words"
-                    )
-                }
-
-                if (item.summaryLastUpdatedMillis != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Updated ${formatDateTime(item.summaryLastUpdatedMillis)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-
-            // Action area
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Surface(
-                        onClick = onSummarize,
-                        shape = CircleShape,
-                        color = if (item.needsRefresh) MaterialTheme.colorScheme.primaryContainer 
-                                else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Re-summarize",
-                                modifier = Modifier.size(20.dp),
-                                tint = if (item.needsRefresh) MaterialTheme.colorScheme.onPrimaryContainer 
-                                       else MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                }
-            }
+            Text("00:00", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
+            Text("12:00", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
+            Text("23:59", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp)
         }
     }
 }
 
-/**
- * Small badge for metadata display within cards.
- */
-@Composable
-private fun MetadataBadge(icon: ImageVector, text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * UI model for each summary file displayed in Daily View.
- */
 private data class DaySummaryItem(
     val dayKey: String,
     val hasSummary: Boolean,
     val thoughtCount: Int,
-    val summaryWordCount: Int,
+    val thoughtTimestamps: List<Long>,
     val summaryLastUpdatedMillis: Long?,
     val lastThoughtUpdatedMillis: Long?,
     val fileName: String,
 ) {
-    /**
-     * True if thoughts have been modified after the summary was last generated.
-     */
     val needsRefresh: Boolean
-        get() = summaryLastUpdatedMillis != null &&
+        get() = hasSummary && 
+                summaryLastUpdatedMillis != null &&
                 lastThoughtUpdatedMillis != null &&
-                lastThoughtUpdatedMillis > (summaryLastUpdatedMillis + 1000) // 1s buffer for FS precision
+                lastThoughtUpdatedMillis > (summaryLastUpdatedMillis + 1000)
 }
 
-/**
- * Counts words in markdown text for quick metadata display.
- */
-private fun String.wordCount(): Int {
-    if (isBlank()) return 0
-    return trim().split(Regex("\\s+")).count { token -> token.isNotBlank() }
-}
-
-/**
- * Returns today's date as a UTC midnight timestamp for the date picker.
- */
-private fun todayUtcStartOfDayMillis(): Long {
-    return LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-}
-
-/**
- * Formats a week range for user-facing display labels.
- */
 private fun formatWeekRange(start: LocalDate): String {
     val end = start.plusDays(6)
-    val monthDayFormatter = DateTimeFormatter.ofPattern("MMM dd")
-
-    return if (start.year == end.year) {
-        "${start.format(monthDayFormatter)} - ${end.format(monthDayFormatter)}, ${start.year}"
-    } else {
-        val yearFormatter = DateTimeFormatter.ofPattern("yyyy")
-        "${start.format(monthDayFormatter)}, ${start.format(yearFormatter)} - ${end.format(monthDayFormatter)}, ${end.format(yearFormatter)}"
-    }
-}
-
-/**
- * Converts a date picker timestamp into the app's yyyymmdd day key.
- */
-private fun dayKeyFromUtcMillis(timestampMillis: Long): String {
-    return Instant.ofEpochMilli(timestampMillis)
-        .atZone(ZoneOffset.UTC)
-        .toLocalDate()
-        .format(DateTimeFormatter.BASIC_ISO_DATE)
+    return "${start.format(DateTimeFormatter.ofPattern("MMM dd"))} - ${end.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}"
 }
