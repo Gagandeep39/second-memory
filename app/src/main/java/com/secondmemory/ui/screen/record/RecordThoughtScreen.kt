@@ -141,7 +141,18 @@ fun RecordThoughtScreen(
                 override fun onError(error: Int) {
                     rmsLevel = 0f
                     isListening = false
-                    speechStatus = "Speech capture failed (code $error). Try again."
+                    speechStatus = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Tap to try again."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timed out. Tap to try again."
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
+                        SpeechRecognizer.ERROR_CLIENT -> "Client-side error."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions."
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error. Check connection."
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy. Please wait."
+                        SpeechRecognizer.ERROR_SERVER -> "Server error."
+                        else -> "Speech capture failed (code $error). Try again."
+                    }
                 }
 
                 override fun onResults(results: Bundle?) {
