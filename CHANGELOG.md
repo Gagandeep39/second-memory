@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 10.0
+
+- Updated all libraries
+- Changed target SDK to 37
+- Removed continous recording (Now recording starts only one automatically)
+- Improved recording error messages
+- Redesigned Daily view UI
+
 ## 9.0
 
 - Updated to markdown

@@ -59,7 +59,6 @@ fun AppNavHost(
                 dailySummaryRepository = dailySummaryRepository,
                 settingsRepository = settingsRepository,
                 operationLogRepository = operationLogRepository,
-                llmSummaryClient = llmSummaryClient,
                 onOpenSummary = { fileName ->
                     navController.navigate(AppDestination.SummaryDetail.routeForFile(fileName))
                 },

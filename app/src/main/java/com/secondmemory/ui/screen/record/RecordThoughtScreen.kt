@@ -72,7 +72,6 @@ fun RecordThoughtScreen(
     var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
     var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
     var showHint by remember { mutableStateOf(true) }
-    var isUserRequestedStop by remember { mutableStateOf(false) }
     // Hide hint after 3.5 seconds
     LaunchedEffect(Unit) {
         showHint = true
@@ -141,34 +140,25 @@ fun RecordThoughtScreen(
 
                 override fun onError(error: Int) {
                     rmsLevel = 0f
-
-                    // 1. If the user explicitly clicked stop, ignore the error and exit gracefully.
-                    if (isUserRequestedStop) {
-                        isListening = false
-                        speechStatus = "Stopped by user."
-                        return
-                    }
-
-                    // 2. If it's a silence timeout, restart the listener to keep it alive.
-                    if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_NO_MATCH) {
-                        beginListening()
-                    } else {
-                        // 3. Handle actual failures (network issues, permissions, etc.)
-                        isListening = false
-                        speechStatus = "Speech capture failed (code $error). Try again."
+                    isListening = false
+                    speechStatus = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Tap to try again."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timed out. Tap to try again."
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
+                        SpeechRecognizer.ERROR_CLIENT -> "Client-side error."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions."
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error. Check connection."
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy. Please wait."
+                        SpeechRecognizer.ERROR_SERVER -> "Server error."
+                        else -> "Speech capture failed (code $error). Try again."
                     }
                 }
 
                 override fun onResults(results: Bundle?) {
-                    // Process final results here if needed
-
-                    // If the user hasn't clicked stop, keep the loop going
-                    if (!isUserRequestedStop) {
-                        beginListening()
-                    } else {
-                        isListening = false
-                        speechStatus = "Done."
-                    }
+                    isListening = false
+                    rmsLevel = 0f
+                    speechStatus = "Done."
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -340,7 +330,6 @@ fun RecordThoughtScreen(
                                     if (isListening) {
                                         speechRecognizer?.stopListening()
                                         isListening = false
-                                        isUserRequestedStop = true
                                         rmsLevel = 0f
                                         speechStatus = "Stopped listening."
                                     } else {
@@ -348,7 +337,6 @@ fun RecordThoughtScreen(
                                             context,
                                             Manifest.permission.RECORD_AUDIO,
                                         ) == PackageManager.PERMISSION_GRANTED
-                                        isUserRequestedStop = false
 
                                         if (isGranted) {
                                             beginListening()
