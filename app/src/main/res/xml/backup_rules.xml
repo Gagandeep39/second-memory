@@ -6,8 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+   <!-- Prevent restoring encrypted prefs/keysets that can trigger AEADBadTagException after reinstall or device transfer. -->
+   <exclude domain="sharedpref" path="secure_settings.xml" />
+   <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs_key_keyset__.xml" />
+   <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs_value_keyset__.xml" />
 </full-backup-content>

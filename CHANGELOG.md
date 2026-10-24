@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 12.0
+
+- Crashfix for Google Play Store published version caused by Secured Shared pref
+
+## 11.0
+
+- Updated libraries
+
 ## 10.0
 
 - Updated all libraries
