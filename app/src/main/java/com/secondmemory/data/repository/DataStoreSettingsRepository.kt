@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import android.content.SharedPreferences
 import com.secondmemory.domain.model.AIProvider
 import com.secondmemory.domain.model.AppSettings
 import com.secondmemory.domain.model.SyncMetadata
@@ -33,17 +34,8 @@ class DataStoreSettingsRepository(
 ) : SettingsRepository {
     private val operationLogRepository = DataStoreOperationLogRepository(context)
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val securePrefs = EncryptedSharedPreferences.create(
-        context,
-        "secure_settings",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    @Volatile
+    private var securePrefs = createSecurePrefsWithRecovery()
 
     override fun observeSettings(): Flow<AppSettings> {
         return context.appSettingsStore.data.combine(syncRepository.observeSyncMetadata()) { preferences, syncMetadata ->
@@ -156,7 +148,7 @@ class DataStoreSettingsRepository(
         val provider = runCatching { AIProvider.valueOf(providerName) }.getOrDefault(AIProvider.GEMINI)
         
         // Read only from secure storage
-        val aiApiKey = securePrefs.getString(Keys.SECURE_AI_API_KEY, "") ?: ""
+        val aiApiKey = readSecureApiKey()
             
         val cloudEnabled = this[Keys.CLOUD_SUMMARY_ENABLED] ?: false
         val driveEnabled = (this[Keys.DRIVE_SYNC_ENABLED] ?: false) && !connectedAccount.isNullOrBlank()
@@ -197,7 +189,64 @@ class DataStoreSettingsRepository(
         const val SECURE_AI_API_KEY = "ai_api_key"
     }
 
+    /**
+     * Creates encrypted preferences and recovers from keystore/restore corruption by
+     * resetting only the secure settings file.
+     */
+    private fun createSecurePrefsWithRecovery(): SharedPreferences {
+        return runCatching {
+            createSecurePrefs()
+        }.getOrElse {
+            resetSecureStorage()
+            createSecurePrefs()
+        }
+    }
+
+    /**
+     * Builds the encrypted shared preferences instance used for API key storage.
+     */
+    private fun createSecurePrefs(): SharedPreferences {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        return EncryptedSharedPreferences.create(
+            context,
+            SECURE_PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    /**
+     * Reads API key from encrypted storage and recovers if ciphertext or key material is invalid.
+     */
+    private fun readSecureApiKey(): String {
+        return runCatching {
+            securePrefs.getString(Keys.SECURE_AI_API_KEY, "") ?: ""
+        }.getOrElse {
+            synchronized(this) {
+                resetSecureStorage()
+                securePrefs = createSecurePrefs()
+            }
+            ""
+        }
+    }
+
+    /**
+     * Deletes encrypted preference and keyset files so they can be recreated cleanly.
+     */
+    private fun resetSecureStorage() {
+        context.deleteSharedPreferences(SECURE_PREFS_NAME)
+        context.deleteSharedPreferences(SECURE_KEY_KEYSET_PREFS_NAME)
+        context.deleteSharedPreferences(SECURE_VALUE_KEYSET_PREFS_NAME)
+    }
+
     private companion object {
+        const val SECURE_PREFS_NAME = "secure_settings"
+        const val SECURE_KEY_KEYSET_PREFS_NAME = "__androidx_security_crypto_encrypted_prefs_key_keyset__"
+        const val SECURE_VALUE_KEYSET_PREFS_NAME = "__androidx_security_crypto_encrypted_prefs_value_keyset__"
         const val DEFAULT_PROMPT = """You are generating a structured daily journal summary from raw thought logs. 
 
 Input: JSON containing timestamped thoughts captured throughout a single day. 
