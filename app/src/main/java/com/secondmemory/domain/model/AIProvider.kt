@@ -8,5 +8,7 @@ enum class AIProvider(val displayName: String, val defaultBaseUrl: String) {
     ANTHROPIC("Anthropic", "https://api.anthropic.com/v1"),
     GEMINI("Gemini", "https://generativelanguage.googleapis.com/v1beta"),
     GROQ("Groq", "https://api.groq.com/openai/v1"),
-    CUSTOM("Custom / Ollama", "http://localhost:11434/v1")
+    CUSTOM("Custom / Ollama", "http://localhost:11434/v1"),
+    /** Local on-device Gemini Nano via ML Kit GenAI Prompt API. */
+    LOCAL_GEN_AI("Local Gen AI", "")
 }

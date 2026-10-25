@@ -527,58 +527,79 @@ fun SettingsScreen(
                                         aiBaseUrl = provider.defaultBaseUrl
                                         providerExpanded = false
                                         // Reset model when provider changes
-                                        aiModel = ""
-                                        availableModels = emptyList()
+                                        aiModel = if (provider == AIProvider.LOCAL_GEN_AI) "Gemini Nano" else ""
+                                        availableModels = if (provider == AIProvider.LOCAL_GEN_AI) listOf("Gemini Nano") else emptyList()
                                     }
                                 )
                             }
                         }
                     }
 
-                    // Base URL
-                    OutlinedTextField(
-                        value = aiBaseUrl,
-                        onValueChange = { 
-                            aiBaseUrl = it
-                            availableModels = emptyList()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Base URL") },
-                        placeholder = { Text("https://api.openai.com/v1") },
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.large
-                    )
-
-                    // API Key
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (aiProvider == AIProvider.LOCAL_GEN_AI) {
+                        Surface(
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Local Gen AI (Gemini Nano)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Runs entirely on-device via AICore. No API key or internet connection required. Note: Summary requests will fail if the app is not open in the foreground.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        // Base URL
                         OutlinedTextField(
-                            value = aiApiKey,
-                            onValueChange = {
-                                aiApiKey = it
+                            value = aiBaseUrl,
+                            onValueChange = { 
+                                aiBaseUrl = it
                                 availableModels = emptyList()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("API Key") },
-                            leadingIcon = { Icon(Icons.Outlined.VpnKey, null) },
-                            trailingIcon = {
-                                IconButton(onClick = { aiApiKeyVisible = !aiApiKeyVisible }) {
-                                    Icon(
-                                        imageVector = if (aiApiKeyVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                        contentDescription = if (aiApiKeyVisible) "Hide API Key" else "Show API Key"
-                                    )
-                                }
-                            },
-                            visualTransformation = if (aiApiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                            label = { Text("Base URL") },
+                            placeholder = { Text("https://api.openai.com/v1") },
                             singleLine = true,
                             shape = MaterialTheme.shapes.large
                         )
-                        if (aiProvider != AIProvider.CUSTOM) {
-                            Text(
-                                text = "Needed to list all available models. Incorrect key will give no models.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp)
+
+                        // API Key
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedTextField(
+                                value = aiApiKey,
+                                onValueChange = {
+                                    aiApiKey = it
+                                    availableModels = emptyList()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("API Key") },
+                                leadingIcon = { Icon(Icons.Outlined.VpnKey, null) },
+                                trailingIcon = {
+                                    IconButton(onClick = { aiApiKeyVisible = !aiApiKeyVisible }) {
+                                        Icon(
+                                            imageVector = if (aiApiKeyVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                            contentDescription = if (aiApiKeyVisible) "Hide API Key" else "Show API Key"
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (aiApiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                                singleLine = true,
+                                shape = MaterialTheme.shapes.large
                             )
+                            if (aiProvider != AIProvider.CUSTOM) {
+                                Text(
+                                    text = "Needed to list all available models. Incorrect key will give no models.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                )
+                            }
                         }
                     }
 
@@ -588,13 +609,17 @@ fun SettingsScreen(
                         ExposedDropdownMenuBox(
                             expanded = modelExpanded,
                             onExpandedChange = {
-                                if (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM) {
+                                if (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM || aiProvider == AIProvider.LOCAL_GEN_AI) {
                                     modelExpanded = !modelExpanded
                                     if (modelExpanded && availableModels.isEmpty()) {
-                                        scope.launch {
-                                            isFetchingModels = true
-                                            availableModels = llmSummaryClient.fetchModels(aiProvider, aiBaseUrl, aiApiKey)
-                                            isFetchingModels = false
+                                        if (aiProvider == AIProvider.LOCAL_GEN_AI) {
+                                            availableModels = listOf("Gemini Nano")
+                                        } else {
+                                            scope.launch {
+                                                isFetchingModels = true
+                                                availableModels = llmSummaryClient.fetchModels(aiProvider, aiBaseUrl, aiApiKey)
+                                                isFetchingModels = false
+                                            }
                                         }
                                     }
                                 }
@@ -603,7 +628,8 @@ fun SettingsScreen(
                         ) {
                             OutlinedTextField(
                                 value = aiModel,
-                                onValueChange = { aiModel = it },
+                                onValueChange = { if (aiProvider != AIProvider.LOCAL_GEN_AI) aiModel = it },
+                                readOnly = aiProvider == AIProvider.LOCAL_GEN_AI,
                                 modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                                 label = { Text("Model") },
                                 trailingIcon = {
@@ -634,11 +660,13 @@ fun SettingsScreen(
                             }
                         }
                         Text(
-                            text = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
+                            text = if (aiProvider == AIProvider.LOCAL_GEN_AI)
+                                "Using on-device Gemini Nano model"
+                            else if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
                                 "API key is needed to list all available models"
                             else "Select or type the model ID (e.g. gpt-4o, gemini-1.5-pro)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM) 
+                            color = if (aiApiKey.isBlank() && aiProvider != AIProvider.CUSTOM && aiProvider != AIProvider.LOCAL_GEN_AI) 
                                 MaterialTheme.colorScheme.error 
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp)
@@ -670,7 +698,7 @@ fun SettingsScreen(
 
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
-                            enabled = (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM) && aiModel.isNotBlank(),
+                            enabled = (aiApiKey.isNotBlank() || aiProvider == AIProvider.CUSTOM || aiProvider == AIProvider.LOCAL_GEN_AI) && aiModel.isNotBlank(),
                             onClick = {
                                 scope.launch {
                                     aiStatusMessage = "Testing connection..."
