@@ -18,7 +18,7 @@ The application includes the following features:
 - Daily View and Weekly View with summary cards for each day/week
 - Daily and weekly summary detail screens with markdown rendering
 - Users can edit the AI summarization prompt in Settings, allowing for personalized summary instructions 
-- Support for multiple LLM connections, including local models
+- Support for multiple LLM connections, including local models ("Local Gen AI" / Gemini Nano on-device summaries via ML Kit GenAI Prompt API)
 - Easily switch between any custom, local, or cloud LLM endpoints in Settings
 - Settings screen with:
    - Google Drive sync toggle
@@ -86,17 +86,17 @@ Daily summary repository:
 1. [app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt](app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt)
 
 
-## Cloud Summary Flow (Custom LLM)
+## Cloud Summary Flow (Custom LLM / Local Gen AI)
 
 User flow:
 1. Open Settings.
-2. Select LLM provider (Gemini, custom, or local).
-3. Enter and save API key (stored securely).
+2. Select LLM provider (`Gemini`, `OpenAI`, `Anthropic`, `Groq`, `Custom / Ollama`, or `Local Gen AI`).
+3. If using cloud/custom, enter and save API key (stored securely) and Base URL. If using `Local Gen AI`, no API key or URL is required (uses on-device Gemini Nano via ML Kit GenAI Prompt API, downloading model weights automatically if needed).
 4. Optionally edit the daily summary prompt for personalized instructions.
 5. Test LLM connection.
 6. Enable Cloud Summaries toggle.
 7. In Daily View, either tap `Summarize` for today or use `Calendar` to pick a specific date.
-8. App reads `data/raw/yyyymmdd.json`, calls the selected LLM, writes `data/daily/yyyymmdd.md`.
+8. App reads `data/raw/yyyymmdd.json`, calls the selected LLM, writes `data/daily/yyyymmdd.md`. (*Note: Local Gen AI summary generation requires the app to be open in the foreground.*)
 
 LLM abstraction (multi-provider ready):
 1. [app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt](app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt)
