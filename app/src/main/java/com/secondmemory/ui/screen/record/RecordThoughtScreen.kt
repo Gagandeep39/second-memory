@@ -1,12 +1,7 @@
 package com.secondmemory.ui.screen.record
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,12 +42,20 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.google.mlkit.genai.common.DownloadStatus
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.audio.AudioSource
+import com.google.mlkit.genai.speechrecognition.SpeechRecognition
+import com.google.mlkit.genai.speechrecognition.SpeechRecognizerOptions
+import com.google.mlkit.genai.speechrecognition.SpeechRecognizerResponse
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -79,30 +82,89 @@ fun RecordThoughtScreen(
         showHint = false
     }
 
-    val speechRecognizer = remember(context) {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            SpeechRecognizer.createSpeechRecognizer(context)
-        } else {
-            null
-        }
+    val speechRecognizer = remember {
+        val options = SpeechRecognizerOptions.Builder().apply {
+            locale = Locale.US
+            preferredMode = SpeechRecognizerOptions.Mode.MODE_BASIC
+        }.build()
+        SpeechRecognition.getClient(options)
     }
+    var recognitionJob by remember { mutableStateOf<Job?>(null) }
 
-    val speechIntent = remember {
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        }
+    fun stopListening() {
+        recognitionJob?.cancel()
+        scope.launch { speechRecognizer.stopRecognition() }
+        recognitionJob = null
+        isListening = false
+        rmsLevel = 0f
     }
 
     fun beginListening() {
-        if (speechRecognizer == null) {
-            speechStatus = "Speech recognition is not available on this device."
-            return
-        }
+        if (recognitionJob?.isActive == true) return
+
         listeningBaseValue = draftTextFieldValue
-        speechStatus = "Listening..."
+        speechStatus = "Preparing speech recognition..."
         isListening = true
-        speechRecognizer.startListening(speechIntent)
+        recognitionJob = scope.launch {
+            try {
+                when (speechRecognizer.checkStatus()) {
+                    FeatureStatus.DOWNLOADABLE -> {
+                        speechRecognizer.download().collect { status ->
+                            when (status) {
+                                is DownloadStatus.DownloadProgress -> {
+                                    speechStatus = "Downloading speech model..."
+                                }
+                                is DownloadStatus.DownloadCompleted -> {
+                                    speechStatus = "Listening..."
+                                }
+                                is DownloadStatus.DownloadFailed -> {
+                                    throw IllegalStateException("Speech model download failed")
+                                }
+                                else -> Unit
+                            }
+                        }
+                    }
+                    FeatureStatus.AVAILABLE -> Unit
+                    else -> throw IllegalStateException("Speech recognition is unavailable on this device")
+                }
+
+                speechStatus = "Listening..."
+                var committedText = listeningBaseValue
+                val request = com.google.mlkit.genai.speechrecognition.SpeechRecognizerRequest.Builder().apply {
+                    audioSource = AudioSource.fromMic()
+                }.build()
+
+                speechRecognizer.startRecognition(request).collect { response ->
+                    when (response) {
+                        is SpeechRecognizerResponse.PartialTextResponse -> {
+                            draftTextFieldValue = appendTranscript(committedText, response.text)
+                            hasSpeechInput = response.text.isNotBlank()
+                            rmsLevel = 0.35f
+                        }
+                        is SpeechRecognizerResponse.FinalTextResponse -> {
+                            committedText = appendTranscript(committedText, response.text)
+                            draftTextFieldValue = committedText
+                            hasSpeechInput = response.text.isNotBlank()
+                            rmsLevel = 0f
+                        }
+                        is SpeechRecognizerResponse.ErrorResponse -> {
+                            throw response.e
+                        }
+                        is SpeechRecognizerResponse.CompletedResponse -> {
+                            speechStatus = "Done."
+                        }
+                    }
+                }
+            } catch (error: Exception) {
+                if (isListening) {
+                    speechStatus = error.message ?: "Speech recognition failed."
+                }
+            } finally {
+                isListening = false
+                rmsLevel = 0f
+                recognitionJob = null
+            }
+        }
     }
 
     val requestAudioPermission = rememberLauncherForActivityResult(
@@ -116,67 +178,12 @@ fun RecordThoughtScreen(
     }
 
     DisposableEffect(speechRecognizer) {
-        if (speechRecognizer != null) {
-            speechRecognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    speechStatus = "Listening..."
-                }
-
-                override fun onBeginningOfSpeech() {
-                    speechStatus = "Capturing speech..."
-                }
-
-                override fun onRmsChanged(rmsdB: Float) {
-                    rmsLevel = normalizeRmsLevel(rmsdB)
-                }
-
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                override fun onEndOfSpeech() {
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Processing transcription..."
-                }
-
-                override fun onError(error: Int) {
-                    rmsLevel = 0f
-                    isListening = false
-                    speechStatus = when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Tap to try again."
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timed out. Tap to try again."
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                        SpeechRecognizer.ERROR_CLIENT -> "Client-side error."
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions."
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error. Check connection."
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy. Please wait."
-                        SpeechRecognizer.ERROR_SERVER -> "Server error."
-                        else -> "Speech capture failed (code $error). Try again."
-                    }
-                }
-
-                override fun onResults(results: Bundle?) {
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Done."
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val partial = partialResults
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                    if (!partial.isNullOrBlank()) {
-                        draftTextFieldValue = appendTranscript(listeningBaseValue, partial)
-                        hasSpeechInput = true
-                    }
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            })
-        }
-
         onDispose {
-            speechRecognizer?.destroy()
+            recognitionJob?.cancel()
+            scope.launch {
+                speechRecognizer.stopRecognition()
+                speechRecognizer.close()
+            }
         }
     }
 
@@ -328,9 +335,7 @@ fun RecordThoughtScreen(
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                 ) {
                                     if (isListening) {
-                                        speechRecognizer?.stopListening()
-                                        isListening = false
-                                        rmsLevel = 0f
+                                        stopListening()
                                         speechStatus = "Stopped listening."
                                     } else {
                                         val isGranted = ContextCompat.checkSelfPermission(
