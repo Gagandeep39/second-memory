@@ -11,13 +11,14 @@ The application includes the following features:
 - Launcher quick action (long-press app icon) to open Record Thought directly
 - Home screen Quick Record widget for one-tap access to Record Thought (now includes app launch button)
 - Dedicated Record Thought activity without navigation chrome
-- Record Thought screen with Speech-to-text input, Manual editing
+- Record Thought screen with on-device GenAI speech-to-text input and manual editing
+- Speech recognition uses Google ML Kit GenAI Speech Recognition in basic mode, downloading its speech model when required
 - Cursor-aware speech insertion at current cursor/selection
 - Raw Thoughts browsing by date with edit and delete options (stored as daily JSON files)
 - Daily View and Weekly View with summary cards for each day/week
 - Daily and weekly summary detail screens with markdown rendering
 - Users can edit the AI summarization prompt in Settings, allowing for personalized summary instructions 
-- Support for multiple LLM connections, including local models
+- Support for multiple LLM connections, including local models ("Local Gen AI" / Gemini Nano on-device summaries via ML Kit GenAI Prompt API)
 - Easily switch between any custom, local, or cloud LLM endpoints in Settings
 - Settings screen with:
    - Google Drive sync toggle
@@ -43,8 +44,8 @@ The application includes the following features:
 
 Layers:
 1. `ui`: Compose screens, components, and navigation.
-2. `domain`: repository contracts, models, and LLM abstraction.
-3. `data`: file repositories, DataStore settings/sync/operation-log repositories, Gemini client.
+2. `domain`: repository contracts, models, speech-recognition contract, and LLM abstraction.
+3. `data`: file repositories, DataStore settings/sync/operation-log repositories, speech-recognition and Gemini clients.
 4. `util`: date/time and data path utilities.
 
 Primary composition and dependency wiring:
@@ -85,17 +86,17 @@ Daily summary repository:
 1. [app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt](app/src/main/java/com/secondmemory/data/repository/FileDailySummaryRepository.kt)
 
 
-## Cloud Summary Flow (Custom LLM)
+## Cloud Summary Flow (Custom LLM / Local Gen AI)
 
 User flow:
 1. Open Settings.
-2. Select LLM provider (Gemini, custom, or local).
-3. Enter and save API key (stored securely).
+2. Select LLM provider (`Gemini`, `OpenAI`, `Anthropic`, `Groq`, `Custom / Ollama`, or `Local Gen AI`).
+3. If using cloud/custom, enter and save API key (stored securely) and Base URL. If using `Local Gen AI`, no API key or URL is required (uses on-device Gemini Nano via ML Kit GenAI Prompt API, downloading model weights automatically if needed).
 4. Optionally edit the daily summary prompt for personalized instructions.
 5. Test LLM connection.
 6. Enable Cloud Summaries toggle.
 7. In Daily View, either tap `Summarize` for today or use `Calendar` to pick a specific date.
-8. App reads `data/raw/yyyymmdd.json`, calls the selected LLM, writes `data/daily/yyyymmdd.md`.
+8. App reads `data/raw/yyyymmdd.json`, calls the selected LLM, writes `data/daily/yyyymmdd.md`. (*Note: Local Gen AI summary generation requires the app to be open in the foreground.*)
 
 LLM abstraction (multi-provider ready):
 1. [app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt](app/src/main/java/com/secondmemory/domain/llm/LlmSummaryClient.kt)
@@ -180,6 +181,8 @@ Record Thought:
 4. Speech insertion at cursor/selection.
 5. Save to today's raw JSON.
 6. [app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt](app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt)
+7. Speech session state and lifecycle: [app/src/main/java/com/secondmemory/ui/screen/record/SpeechRecognitionViewModel.kt](app/src/main/java/com/secondmemory/ui/screen/record/SpeechRecognitionViewModel.kt)
+8. GenAI speech implementation: [app/src/main/java/com/secondmemory/data/repository/GenAiSpeechRecognitionRepository.kt](app/src/main/java/com/secondmemory/data/repository/GenAiSpeechRecognitionRepository.kt)
 
 Daily View:
 1. List daily summary markdown files (`data/daily/*.md`) by day key.
@@ -214,6 +217,8 @@ Declared in [app/src/main/AndroidManifest.xml](app/src/main/AndroidManifest.xml)
 1. `android.permission.RECORD_AUDIO`
 2. `android.permission.INTERNET`
 3. `android.permission.POST_NOTIFICATIONS`
+
+Speech recognition is handled on-device through Google ML Kit GenAI Speech Recognition. The Record Thought screen checks whether the model is available, downloads it when needed, and then captures microphone input for live and final transcription. A Google Cloud Speech-to-Text fallback or provider switch is not currently implemented.
 
 ## Build and Run
 

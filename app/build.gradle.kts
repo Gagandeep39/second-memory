@@ -13,8 +13,8 @@ android {
         applicationId = "com.secondmemory"
         minSdk = 33
         targetSdk = 37
-        versionCode = 12
-        versionName = "12.0"
+        versionCode = 13
+        versionName = "13.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -75,6 +75,8 @@ dependencies {
     implementation(libs.google.api.services.drive)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.genai.speech.recognition)
+    implementation(libs.genai.prompt)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

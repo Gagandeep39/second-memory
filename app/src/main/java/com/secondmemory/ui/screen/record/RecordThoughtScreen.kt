@@ -1,12 +1,7 @@
 package com.secondmemory.ui.screen.record
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,8 +28,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,16 +56,15 @@ import java.util.UUID
 @Composable
 fun RecordThoughtScreen(
     thoughtRepository: ThoughtRepository,
+    speechRecognitionViewModel: SpeechRecognitionViewModel,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val speechState by speechRecognitionViewModel.uiState.collectAsState()
     var draftTextFieldValue by remember { mutableStateOf(TextFieldValue("")) }
-    var isListening by remember { mutableStateOf(false) }
     var hasSpeechInput by remember { mutableStateOf(false) }
-    var rmsLevel by remember { mutableStateOf(0f) }
-    var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
-    var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
+    var committedTextFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     var showHint by remember { mutableStateOf(true) }
     // Hide hint after 3.5 seconds
     LaunchedEffect(Unit) {
@@ -79,30 +73,9 @@ fun RecordThoughtScreen(
         showHint = false
     }
 
-    val speechRecognizer = remember(context) {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            SpeechRecognizer.createSpeechRecognizer(context)
-        } else {
-            null
-        }
-    }
-
-    val speechIntent = remember {
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        }
-    }
-
     fun beginListening() {
-        if (speechRecognizer == null) {
-            speechStatus = "Speech recognition is not available on this device."
-            return
-        }
-        listeningBaseValue = draftTextFieldValue
-        speechStatus = "Listening..."
-        isListening = true
-        speechRecognizer.startListening(speechIntent)
+        committedTextFieldValue = draftTextFieldValue
+        speechRecognitionViewModel.start()
     }
 
     val requestAudioPermission = rememberLauncherForActivityResult(
@@ -111,72 +84,7 @@ fun RecordThoughtScreen(
         if (granted) {
             beginListening()
         } else {
-            speechStatus = "Microphone permission denied. You can still type manually."
-        }
-    }
-
-    DisposableEffect(speechRecognizer) {
-        if (speechRecognizer != null) {
-            speechRecognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    speechStatus = "Listening..."
-                }
-
-                override fun onBeginningOfSpeech() {
-                    speechStatus = "Capturing speech..."
-                }
-
-                override fun onRmsChanged(rmsdB: Float) {
-                    rmsLevel = normalizeRmsLevel(rmsdB)
-                }
-
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                override fun onEndOfSpeech() {
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Processing transcription..."
-                }
-
-                override fun onError(error: Int) {
-                    rmsLevel = 0f
-                    isListening = false
-                    speechStatus = when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Tap to try again."
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timed out. Tap to try again."
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                        SpeechRecognizer.ERROR_CLIENT -> "Client-side error."
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions."
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error. Check connection."
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy. Please wait."
-                        SpeechRecognizer.ERROR_SERVER -> "Server error."
-                        else -> "Speech capture failed (code $error). Try again."
-                    }
-                }
-
-                override fun onResults(results: Bundle?) {
-                    isListening = false
-                    rmsLevel = 0f
-                    speechStatus = "Done."
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val partial = partialResults
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                    if (!partial.isNullOrBlank()) {
-                        draftTextFieldValue = appendTranscript(listeningBaseValue, partial)
-                        hasSpeechInput = true
-                    }
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            })
-        }
-
-        onDispose {
-            speechRecognizer?.destroy()
+            speechRecognitionViewModel.onPermissionDenied()
         }
     }
 
@@ -190,6 +98,24 @@ fun RecordThoughtScreen(
             beginListening()
         } else {
             requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    LaunchedEffect(speechState.transcript, speechState.isFinalTranscript) {
+        if (speechState.transcript.isBlank()) return@LaunchedEffect
+
+        hasSpeechInput = true
+        if (speechState.isFinalTranscript) {
+            committedTextFieldValue = appendTranscript(
+                committedTextFieldValue,
+                speechState.transcript,
+            )
+            draftTextFieldValue = committedTextFieldValue
+        } else {
+            draftTextFieldValue = appendTranscript(
+                committedTextFieldValue,
+                speechState.transcript,
+            )
         }
     }
 
@@ -224,6 +150,7 @@ fun RecordThoughtScreen(
                         onValueChange = {
                             if (it.text != draftTextFieldValue.text) {
                                 hasSpeechInput = false
+                                committedTextFieldValue = it
                             }
                             draftTextFieldValue = it
                         },
@@ -312,14 +239,14 @@ fun RecordThoughtScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = speechStatus,
+                            text = speechState.status,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         AudioLevelVisualizer(
-                            normalizedLevel = rmsLevel,
-                            isListening = isListening,
+                            normalizedLevel = if (speechState.isListening && !speechState.isFinalTranscript) 0.35f else 0f,
+                            isListening = speechState.isListening,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -327,11 +254,8 @@ fun RecordThoughtScreen(
                                     indication = null,
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                 ) {
-                                    if (isListening) {
-                                        speechRecognizer?.stopListening()
-                                        isListening = false
-                                        rmsLevel = 0f
-                                        speechStatus = "Stopped listening."
+                                    if (speechState.isListening) {
+                                        speechRecognitionViewModel.stop()
                                     } else {
                                         val isGranted = ContextCompat.checkSelfPermission(
                                             context,
@@ -370,16 +294,9 @@ fun RecordThoughtScreen(
 }
 
 /**
- * Maps platform RMS dB values to a stable 0..1 range for UI animation.
- */
-private fun normalizeRmsLevel(rmsdB: Float): Float {
-    return ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
-}
-
-/**
  * Inserts transcript at the current cursor or selection and moves cursor to inserted end.
  */
-private fun appendTranscript(
+internal fun appendTranscript(
     baseValue: TextFieldValue,
     transcript: String,
 ): TextFieldValue {

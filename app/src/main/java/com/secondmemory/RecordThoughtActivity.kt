@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -12,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.secondmemory.data.repository.JsonThoughtRepository
 import com.secondmemory.ui.screen.record.RecordThoughtScreen
+import com.secondmemory.ui.screen.record.SpeechRecognitionViewModel
+import com.secondmemory.ui.screen.record.SpeechRecognitionViewModelFactory
 import com.secondmemory.ui.theme.SecondMemoryTheme
 
 /**
@@ -22,6 +25,10 @@ import com.secondmemory.ui.theme.SecondMemoryTheme
  * - Launched from widget/shortcut: finishing closes this standalone flow.
  */
 class RecordThoughtActivity : ComponentActivity() {
+    private val speechRecognitionViewModel: SpeechRecognitionViewModel by viewModels {
+        SpeechRecognitionViewModelFactory()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -35,6 +42,7 @@ class RecordThoughtActivity : ComponentActivity() {
                 ) {
                     RecordThoughtScreen(
                         thoughtRepository = thoughtRepository,
+                        speechRecognitionViewModel = speechRecognitionViewModel,
                         onBack = { finish() },
                     )
                 }

@@ -1,5 +1,8 @@
 package com.secondmemory.data.llm
 
+import com.google.mlkit.genai.common.DownloadStatus
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.prompt.Generation
 import com.secondmemory.domain.llm.LlmSummaryClient
 import com.secondmemory.domain.model.AIProvider
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +16,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Default implementation of LlmSummaryClient supporting multiple providers.
+ * Default implementation of LlmSummaryClient supporting multiple providers, including Local Gen AI.
  */
 class DefaultLlmSummaryClient(
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
@@ -22,6 +25,30 @@ class DefaultLlmSummaryClient(
         .writeTimeout(60, TimeUnit.SECONDS)
         .build(),
 ) : LlmSummaryClient {
+    /**
+     * Generates a response using on-device Local Gen AI (Gemini Nano) via ML Kit Prompt API.
+     */
+    private suspend fun generateLocalGenAi(fullPrompt: String): String {
+        val generativeModel = Generation.getClient()
+        when (generativeModel.checkStatus()) {
+            FeatureStatus.DOWNLOADABLE -> {
+                generativeModel.download().collect { status ->
+                    if (status is DownloadStatus.DownloadFailed) {
+                        throw IllegalStateException("Local Gen AI model download failed")
+                    }
+                }
+            }
+            FeatureStatus.AVAILABLE -> Unit
+            else -> throw IllegalStateException("Local Gen AI (Gemini Nano) is unavailable on this device")
+        }
+        val response = generativeModel.generateContent(fullPrompt)
+        val text = response.candidates.firstOrNull()?.text ?: ""
+        if (text.isBlank()) {
+            throw IllegalStateException("Local Gen AI returned an empty summary.")
+        }
+        return text.trim()
+    }
+
     override suspend fun summarizeDay(
         dayKey: String,
         rawJson: String,
@@ -31,11 +58,15 @@ class DefaultLlmSummaryClient(
         model: String,
         prompt: String
     ): String = withContext(Dispatchers.IO) {
+        val fullPrompt = buildPrompt(dayKey = dayKey, content = rawJson, systemPrompt = prompt, type = "Day")
+        if (provider == AIProvider.LOCAL_GEN_AI) {
+            return@withContext generateLocalGenAi(fullPrompt)
+        }
+
         if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
             throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
         }
 
-        val fullPrompt = buildPrompt(dayKey = dayKey, content = rawJson, systemPrompt = prompt, type = "Day")
         val requestBody = buildRequestBody(provider, model, fullPrompt)
 
         val url = when (provider) {
@@ -85,10 +116,6 @@ class DefaultLlmSummaryClient(
         model: String,
         prompt: String
     ): String = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
-            throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
-        }
-
         val weeklySystemPrompt = """
         You are an expert personal growth coach and reflective biographer.
         You will be given a set of daily summaries covering one week. Your job is to synthesize them into a structured weekly reflection.
@@ -126,6 +153,14 @@ class DefaultLlmSummaryClient(
         """.trimIndent()
 
         val fullPrompt = buildPrompt(dayKey = weekKey, content = dailySummaries, systemPrompt = weeklySystemPrompt, type = "Week")
+        if (provider == AIProvider.LOCAL_GEN_AI) {
+            return@withContext generateLocalGenAi(fullPrompt)
+        }
+
+        if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
+            throw IllegalStateException("API key is required for ${provider.displayName} summaries.")
+        }
+
         val requestBody = buildRequestBody(provider, model, fullPrompt)
 
         val url = when (provider) {
@@ -173,6 +208,22 @@ class DefaultLlmSummaryClient(
         model: String,
         prompt: String
     ) = withContext(Dispatchers.IO) {
+        if (provider == AIProvider.LOCAL_GEN_AI) {
+            val generativeModel = Generation.getClient()
+            when (generativeModel.checkStatus()) {
+                FeatureStatus.DOWNLOADABLE -> {
+                    generativeModel.download().collect { status ->
+                        if (status is DownloadStatus.DownloadFailed) {
+                            throw IllegalStateException("Local Gen AI model download failed")
+                        }
+                    }
+                }
+                FeatureStatus.AVAILABLE -> Unit
+                else -> throw IllegalStateException("Local Gen AI is unavailable on this device")
+            }
+            return@withContext
+        }
+
         if (apiKey.isBlank() && provider != AIProvider.CUSTOM) {
             throw IllegalStateException("API key is required for ${provider.displayName}.")
         }
@@ -215,6 +266,10 @@ class DefaultLlmSummaryClient(
         baseUrl: String,
         apiKey: String
     ): List<String> = withContext(Dispatchers.IO) {
+        if (provider == AIProvider.LOCAL_GEN_AI) {
+            return@withContext listOf("Gemini Nano")
+        }
+
         val url = when (provider) {
             AIProvider.GEMINI -> "$baseUrl/models?key=$apiKey"
             else -> "$baseUrl/models"
@@ -330,10 +385,6 @@ class DefaultLlmSummaryClient(
             }
         }
     }
-
-    /**
-     * Builds a markdown-focused instruction prompt for daily summarization.
-     */
 
     /**
      * Combines the system prompt with the specific day/week data into a final prompt string.
