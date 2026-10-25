@@ -44,8 +44,8 @@ The application includes the following features:
 
 Layers:
 1. `ui`: Compose screens, components, and navigation.
-2. `domain`: repository contracts, models, and LLM abstraction.
-3. `data`: file repositories, DataStore settings/sync/operation-log repositories, Gemini client.
+2. `domain`: repository contracts, models, speech-recognition contract, and LLM abstraction.
+3. `data`: file repositories, DataStore settings/sync/operation-log repositories, speech-recognition and Gemini clients.
 4. `util`: date/time and data path utilities.
 
 Primary composition and dependency wiring:
@@ -181,6 +181,8 @@ Record Thought:
 4. Speech insertion at cursor/selection.
 5. Save to today's raw JSON.
 6. [app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt](app/src/main/java/com/secondmemory/ui/screen/record/RecordThoughtScreen.kt)
+7. Speech session state and lifecycle: [app/src/main/java/com/secondmemory/ui/screen/record/SpeechRecognitionViewModel.kt](app/src/main/java/com/secondmemory/ui/screen/record/SpeechRecognitionViewModel.kt)
+8. GenAI speech implementation: [app/src/main/java/com/secondmemory/data/repository/GenAiSpeechRecognitionRepository.kt](app/src/main/java/com/secondmemory/data/repository/GenAiSpeechRecognitionRepository.kt)
 
 Daily View:
 1. List daily summary markdown files (`data/daily/*.md`) by day key.

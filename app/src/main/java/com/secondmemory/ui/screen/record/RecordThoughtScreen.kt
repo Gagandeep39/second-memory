@@ -28,8 +28,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,20 +42,12 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.google.mlkit.genai.common.DownloadStatus
-import com.google.mlkit.genai.common.FeatureStatus
-import com.google.mlkit.genai.common.audio.AudioSource
-import com.google.mlkit.genai.speechrecognition.SpeechRecognition
-import com.google.mlkit.genai.speechrecognition.SpeechRecognizerOptions
-import com.google.mlkit.genai.speechrecognition.SpeechRecognizerResponse
 import com.secondmemory.domain.model.Thought
 import com.secondmemory.domain.model.ThoughtSource
 import com.secondmemory.domain.repository.ThoughtRepository
 import com.secondmemory.ui.component.AudioLevelVisualizer
 import com.secondmemory.util.todayDayKey
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.util.Locale
 import java.util.UUID
 
 /**
@@ -64,16 +56,15 @@ import java.util.UUID
 @Composable
 fun RecordThoughtScreen(
     thoughtRepository: ThoughtRepository,
+    speechRecognitionViewModel: SpeechRecognitionViewModel,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val speechState by speechRecognitionViewModel.uiState.collectAsState()
     var draftTextFieldValue by remember { mutableStateOf(TextFieldValue("")) }
-    var isListening by remember { mutableStateOf(false) }
     var hasSpeechInput by remember { mutableStateOf(false) }
-    var rmsLevel by remember { mutableStateOf(0f) }
-    var speechStatus by remember { mutableStateOf("Listening will start automatically.") }
-    var listeningBaseValue by remember { mutableStateOf(TextFieldValue("")) }
+    var committedTextFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     var showHint by remember { mutableStateOf(true) }
     // Hide hint after 3.5 seconds
     LaunchedEffect(Unit) {
@@ -82,89 +73,9 @@ fun RecordThoughtScreen(
         showHint = false
     }
 
-    val speechRecognizer = remember {
-        val options = SpeechRecognizerOptions.Builder().apply {
-            locale = Locale.US
-            preferredMode = SpeechRecognizerOptions.Mode.MODE_BASIC
-        }.build()
-        SpeechRecognition.getClient(options)
-    }
-    var recognitionJob by remember { mutableStateOf<Job?>(null) }
-
-    fun stopListening() {
-        recognitionJob?.cancel()
-        scope.launch { speechRecognizer.stopRecognition() }
-        recognitionJob = null
-        isListening = false
-        rmsLevel = 0f
-    }
-
     fun beginListening() {
-        if (recognitionJob?.isActive == true) return
-
-        listeningBaseValue = draftTextFieldValue
-        speechStatus = "Preparing speech recognition..."
-        isListening = true
-        recognitionJob = scope.launch {
-            try {
-                when (speechRecognizer.checkStatus()) {
-                    FeatureStatus.DOWNLOADABLE -> {
-                        speechRecognizer.download().collect { status ->
-                            when (status) {
-                                is DownloadStatus.DownloadProgress -> {
-                                    speechStatus = "Downloading speech model..."
-                                }
-                                is DownloadStatus.DownloadCompleted -> {
-                                    speechStatus = "Listening..."
-                                }
-                                is DownloadStatus.DownloadFailed -> {
-                                    throw IllegalStateException("Speech model download failed")
-                                }
-                                else -> Unit
-                            }
-                        }
-                    }
-                    FeatureStatus.AVAILABLE -> Unit
-                    else -> throw IllegalStateException("Speech recognition is unavailable on this device")
-                }
-
-                speechStatus = "Listening..."
-                var committedText = listeningBaseValue
-                val request = com.google.mlkit.genai.speechrecognition.SpeechRecognizerRequest.Builder().apply {
-                    audioSource = AudioSource.fromMic()
-                }.build()
-
-                speechRecognizer.startRecognition(request).collect { response ->
-                    when (response) {
-                        is SpeechRecognizerResponse.PartialTextResponse -> {
-                            draftTextFieldValue = appendTranscript(committedText, response.text)
-                            hasSpeechInput = response.text.isNotBlank()
-                            rmsLevel = 0.35f
-                        }
-                        is SpeechRecognizerResponse.FinalTextResponse -> {
-                            committedText = appendTranscript(committedText, response.text)
-                            draftTextFieldValue = committedText
-                            hasSpeechInput = response.text.isNotBlank()
-                            rmsLevel = 0f
-                        }
-                        is SpeechRecognizerResponse.ErrorResponse -> {
-                            throw response.e
-                        }
-                        is SpeechRecognizerResponse.CompletedResponse -> {
-                            speechStatus = "Done."
-                        }
-                    }
-                }
-            } catch (error: Exception) {
-                if (isListening) {
-                    speechStatus = error.message ?: "Speech recognition failed."
-                }
-            } finally {
-                isListening = false
-                rmsLevel = 0f
-                recognitionJob = null
-            }
-        }
+        committedTextFieldValue = draftTextFieldValue
+        speechRecognitionViewModel.start()
     }
 
     val requestAudioPermission = rememberLauncherForActivityResult(
@@ -173,17 +84,7 @@ fun RecordThoughtScreen(
         if (granted) {
             beginListening()
         } else {
-            speechStatus = "Microphone permission denied. You can still type manually."
-        }
-    }
-
-    DisposableEffect(speechRecognizer) {
-        onDispose {
-            recognitionJob?.cancel()
-            scope.launch {
-                speechRecognizer.stopRecognition()
-                speechRecognizer.close()
-            }
+            speechRecognitionViewModel.onPermissionDenied()
         }
     }
 
@@ -197,6 +98,24 @@ fun RecordThoughtScreen(
             beginListening()
         } else {
             requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    LaunchedEffect(speechState.transcript, speechState.isFinalTranscript) {
+        if (speechState.transcript.isBlank()) return@LaunchedEffect
+
+        hasSpeechInput = true
+        if (speechState.isFinalTranscript) {
+            committedTextFieldValue = appendTranscript(
+                committedTextFieldValue,
+                speechState.transcript,
+            )
+            draftTextFieldValue = committedTextFieldValue
+        } else {
+            draftTextFieldValue = appendTranscript(
+                committedTextFieldValue,
+                speechState.transcript,
+            )
         }
     }
 
@@ -231,6 +150,7 @@ fun RecordThoughtScreen(
                         onValueChange = {
                             if (it.text != draftTextFieldValue.text) {
                                 hasSpeechInput = false
+                                committedTextFieldValue = it
                             }
                             draftTextFieldValue = it
                         },
@@ -319,14 +239,14 @@ fun RecordThoughtScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = speechStatus,
+                            text = speechState.status,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         AudioLevelVisualizer(
-                            normalizedLevel = rmsLevel,
-                            isListening = isListening,
+                            normalizedLevel = if (speechState.isListening && !speechState.isFinalTranscript) 0.35f else 0f,
+                            isListening = speechState.isListening,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -334,9 +254,8 @@ fun RecordThoughtScreen(
                                     indication = null,
                                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                 ) {
-                                    if (isListening) {
-                                        stopListening()
-                                        speechStatus = "Stopped listening."
+                                    if (speechState.isListening) {
+                                        speechRecognitionViewModel.stop()
                                     } else {
                                         val isGranted = ContextCompat.checkSelfPermission(
                                             context,
@@ -375,16 +294,9 @@ fun RecordThoughtScreen(
 }
 
 /**
- * Maps platform RMS dB values to a stable 0..1 range for UI animation.
- */
-private fun normalizeRmsLevel(rmsdB: Float): Float {
-    return ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
-}
-
-/**
  * Inserts transcript at the current cursor or selection and moves cursor to inserted end.
  */
-private fun appendTranscript(
+internal fun appendTranscript(
     baseValue: TextFieldValue,
     transcript: String,
 ): TextFieldValue {
