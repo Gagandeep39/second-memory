@@ -11,7 +11,8 @@ The application includes the following features:
 - Launcher quick action (long-press app icon) to open Record Thought directly
 - Home screen Quick Record widget for one-tap access to Record Thought (now includes app launch button)
 - Dedicated Record Thought activity without navigation chrome
-- Record Thought screen with Speech-to-text input, Manual editing
+- Record Thought screen with on-device GenAI speech-to-text input and manual editing
+- Speech recognition uses Google ML Kit GenAI Speech Recognition in basic mode, downloading its speech model when required
 - Cursor-aware speech insertion at current cursor/selection
 - Raw Thoughts browsing by date with edit and delete options (stored as daily JSON files)
 - Daily View and Weekly View with summary cards for each day/week
@@ -214,6 +215,8 @@ Declared in [app/src/main/AndroidManifest.xml](app/src/main/AndroidManifest.xml)
 1. `android.permission.RECORD_AUDIO`
 2. `android.permission.INTERNET`
 3. `android.permission.POST_NOTIFICATIONS`
+
+Speech recognition is handled on-device through Google ML Kit GenAI Speech Recognition. The Record Thought screen checks whether the model is available, downloads it when needed, and then captures microphone input for live and final transcription. A Google Cloud Speech-to-Text fallback or provider switch is not currently implemented.
 
 ## Build and Run
 

@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 13.0
+
+- Replaced Android speech recognition with Google ML Kit GenAI Speech Recognition for on-device transcription
+
 ## 12.0
 
 - Crashfix for Google Play Store published version caused by Secured Shared pref
