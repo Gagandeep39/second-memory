@@ -13,8 +13,8 @@ android {
         applicationId = "com.secondmemory"
         minSdk = 33
         targetSdk = 37
-        versionCode = 12
-        versionName = "12.0"
+        versionCode = 13
+        versionName = "13.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
